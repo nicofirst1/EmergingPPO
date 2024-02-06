@@ -3,15 +3,14 @@ Transformer-based models for emergent communication
 """
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from egg.core import NTXentLoss
 
-from transformers import VisionEncoderDecoderModel, GPT2TokenizerFast, ViTImageProcessor
+from transformers import VisionEncoderDecoderModel, GPT2TokenizerFast, ViTImageProcessor, ViTConfig, \
+    VisionEncoderDecoderConfig, GPT2Config, MaxLengthCriteria, LogitsProcessor, ViTModel, GPT2Model
 
 
 class ViTGPT2Agent(nn.Module):
-
     """Sender/receiver agent based on vision encoder decoder"""
 
     def __init__(self):
@@ -32,9 +31,8 @@ class ViTGPT2Agent(nn.Module):
         )
 
         # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
-        self.W_img = nn.Linear(123,123)  # dummy dimensions
-        self.W_txt = nn.Linear(234,123)
-
+        self.W_img = nn.Linear(123, 123)  # dummy dimensions
+        self.W_txt = nn.Linear(234, 123)
 
     def pool_txt(self, h_read):
         # TODO pool on sequence dimension, or special token?
@@ -45,17 +43,19 @@ class ViTGPT2Agent(nn.Module):
         return h_image.mean(dim=1)
 
     def forward(
-        self,
-        sender_input=None,
-        aux_input=None,  # input to both sender/receiver, unused atm
-        message=None,
-        receiver_input=None
+            self,
+            sender_input=None,
+            aux_input=None,  # input to both sender/receiver, unused atm
+            message=None,
+            receiver_input=None
     ):
         if message is None:
             # Act as Sender (~Image captioning)
             pixel_values = self.image_processor(
                 sender_input, return_tensor="pt"
             ).pixel_values
+
+            pixel_values = torch.tensor(pixel_values)
 
             message_logits = self.model(pixel_values=pixel_values)
 
@@ -83,3 +83,151 @@ class ViTGPT2Agent(nn.Module):
         return outputs
 
 
+class GubleLogitsProcessor(LogitsProcessor):
+
+    def __init__(self, temperature=1.0, hard=True):
+        self.temperature = temperature
+        self.hard = hard
+
+    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
+        return torch.nn.functional.gumbel_softmax(scores, tau=self.temperature, hard=self.hard)
+
+
+class Sender(nn.Module):
+    """Sender/receiver agent based on vision encoder decoder"""
+
+    def __init__(self, tokenizer, image_processor):
+        """TODO: to be defined."""
+        nn.Module.__init__(self)
+
+        config_encoder = ViTConfig.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        config_decoder = GPT2Config()
+        config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
+
+        self.model = VisionEncoderDecoderModel(config=config)
+
+        # # Initialize weights for decoder
+        # self.model.decoder.init_weights()
+
+        # We can use our own here.
+        self.tokenizer = tokenizer
+        self.image_processor = image_processor
+
+        # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
+        self.W_img = nn.Linear(123, 123)  # dummy dimensions
+        self.W_txt = nn.Linear(234, 123)
+
+    def pool_txt(self, h_read):
+        # TODO pool on sequence dimension, or special token?
+        return h_read.mean(dim=1)
+
+    def pool_img(self, h_image):
+        # TODO pool on patches dimension, or special token?
+        return h_image.mean(dim=1)
+
+    def forward(
+            self,
+            sender_input=None,
+            aux_input=None,  # input to both sender/receiver, unused atm
+            message=None,
+            receiver_input=None
+    ):
+        pixel_values = self.image_processor(
+            sender_input, return_tensor="pt"
+        ).pixel_values
+
+        # cast to tensor
+        pixel_values = torch.tensor(pixel_values)
+        # forward pass through the encoder
+        enc_out = self.model.encoder(pixel_values=pixel_values)
+
+        # create the decoder input
+        bos_token_id = self.tokenizer.bos_token_id
+        batch_size = pixel_values.shape[0]
+        decoder_input_ids = torch.full(
+            (batch_size, 1), bos_token_id, dtype=torch.long
+        )
+
+        # define stopping criteria and logits processor
+        stopping_criteria = MaxLengthCriteria(
+            max_length=6
+        )
+        logit_processor = GubleLogitsProcessor(temperature=1.0)
+
+        # forward generation through the decoder
+        gen_out = self.model.decoder.greedy_search(
+            decoder_input_ids,
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            output_scores=True,
+            encoder_outputs=enc_out,
+            stopping_criteria=stopping_criteria,
+            return_dict_in_generate=True,
+            logits_processor=logit_processor
+        )
+
+        messages = gen_out.sequences
+
+        # TODO: something with the scores
+
+        return messages
+
+
+class Receiver(nn.Module):
+    """Sender/receiver agent based on vision encoder decoder"""
+
+    def __init__(self, tokenizer, image_processor):
+        """TODO: to be defined."""
+        nn.Module.__init__(self)
+
+        config_decoder = GPT2Config()
+
+        self.img_encoder = ViTModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        self.text_encoder = GPT2Model(config=config_decoder)
+
+        # We can use our own here.
+        self.tokenizer = tokenizer
+
+        self.image_processor = image_processor
+
+        # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
+        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, 123)  # dummy dimensions
+        self.W_txt = nn.Linear(self.text_encoder.embed_dim, 123)
+
+    def pool_txt(self, h_read):
+        # TODO pool on sequence dimension, or special token?
+        return h_read.mean(dim=1)
+
+    def pool_img(self, h_image):
+        # TODO pool on patches dimension, or special token?
+        return h_image.mean(dim=1)
+
+    def forward(
+            self,
+            sender_input=None,
+            aux_input=None,  # input to both sender/receiver, unused atm
+            message=None,
+            receiver_input=None
+    ):
+        pixel_values = [self.image_processor(ri, return_tensor="pt").pixel_values for ri in receiver_input]
+        pixel_values = [torch.tensor(pv) for pv in pixel_values]
+        # [batch_size,distractors, channels, height, width]
+
+        # forward pass through the encoder
+        img_enc_out = [self.img_encoder(pixel_values=pv) for pv in pixel_values]
+        img_enc_out = [self.pool_img(e.last_hidden_state) for e in img_enc_out]
+        img_enc_out = [self.W_img(e) for e in img_enc_out]
+        img_enc_out = torch.stack(img_enc_out)
+
+        # encode the message
+        txt_enc_out = self.text_encoder(input_ids=message)
+        txt_enc_out=self.pool_txt(txt_enc_out.last_hidden_state)
+        txt_enc_out=self.W_txt(txt_enc_out)
+
+
+        return_dict = {
+            "img_enc_out": img_enc_out,
+            "txt_enc_out": txt_enc_out
+        }
+
+        return return_dict
