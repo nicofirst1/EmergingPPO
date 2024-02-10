@@ -1,6 +1,8 @@
 """
 Transformer-based models for emergent communication
 """
+from functools import partial
+
 import torch
 import torch.nn as nn
 
@@ -93,6 +95,15 @@ class GubleLogitsProcessor(LogitsProcessor):
         return torch.nn.functional.gumbel_softmax(scores, tau=self.temperature, hard=self.hard)
 
 
+def prepare_inputs_for_generation(orig_fn, input_ids, **model_kwargs):
+
+    out=orig_fn(input_ids, **model_kwargs)
+
+    if "encoder_hidden_states" in model_kwargs and "encoder_hidden_states" not in out:
+        out["encoder_hidden_states"] = model_kwargs["encoder_hidden_states"]
+
+    return out
+
 class Sender(nn.Module):
     """Sender/receiver agent based on vision encoder decoder"""
 
@@ -101,10 +112,16 @@ class Sender(nn.Module):
         nn.Module.__init__(self)
 
         config_encoder = ViTConfig.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
-        config_decoder = GPT2Config()
+        config_decoder = GPT2Config(
+            add_cross_attention=True,
+
+        )
         config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
 
         self.model = VisionEncoderDecoderModel(config=config)
+
+        # force decoder to use xattention
+        self.model.decoder.prepare_inputs_for_generation=partial(prepare_inputs_for_generation,     self.model.decoder.prepare_inputs_for_generation)
 
         # # Initialize weights for decoder
         # self.model.decoder.init_weights()
@@ -124,6 +141,7 @@ class Sender(nn.Module):
     def pool_img(self, h_image):
         # TODO pool on patches dimension, or special token?
         return h_image.mean(dim=1)
+
 
     def forward(
             self,
@@ -155,22 +173,24 @@ class Sender(nn.Module):
         logit_processor = GubleLogitsProcessor(temperature=1.0)
 
         # forward generation through the decoder
+        #todo: check if xattention by checking if dec has enc out
         gen_out = self.model.decoder.greedy_search(
             decoder_input_ids,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             output_scores=True,
             encoder_outputs=enc_out,
+            encoder_hidden_states=enc_out.last_hidden_state, # enables Xattention
             stopping_criteria=stopping_criteria,
             return_dict_in_generate=True,
-            logits_processor=logit_processor
+            logits_processor=logit_processor,
         )
 
         messages = gen_out.sequences
-
+        scores=torch.stack(gen_out.scores, dim =1)
         # TODO: something with the scores
 
-        return messages
+        return messages, scores
 
 
 class Receiver(nn.Module):
@@ -182,6 +202,7 @@ class Receiver(nn.Module):
 
         config_decoder = GPT2Config()
 
+        #todo: freeze vit
         self.img_encoder = ViTModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         self.text_encoder = GPT2Model(config=config_decoder)
 
@@ -193,6 +214,7 @@ class Receiver(nn.Module):
         # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
         self.W_img = nn.Linear(self.img_encoder.config.hidden_size, 123)  # dummy dimensions
         self.W_txt = nn.Linear(self.text_encoder.embed_dim, 123)
+        self.text_embedding = nn.Linear(self.tokenizer.vocab_size, self.text_encoder.config.hidden_size)
 
     def pool_txt(self, h_read):
         # TODO pool on sequence dimension, or special token?
@@ -205,7 +227,7 @@ class Receiver(nn.Module):
     def forward(
             self,
             sender_input=None,
-            aux_input=None,  # input to both sender/receiver, unused atm
+            scores=None,  # input to both sender/receiver, unused atm
             message=None,
             receiver_input=None
     ):
@@ -219,9 +241,10 @@ class Receiver(nn.Module):
         img_enc_out = [self.W_img(e) for e in img_enc_out]
         img_enc_out = torch.stack(img_enc_out)
 
-        # encode the message
-        txt_enc_out = self.text_encoder(input_ids=message)
-        txt_enc_out=self.pool_txt(txt_enc_out.last_hidden_state)
+        # encode the message (one hot encoding)
+        #txt_enc_out = self.text_encoder(input_ids=message)
+        txt_enc_out=self.text_embedding(scores)
+        txt_enc_out=self.pool_txt(txt_enc_out)
         txt_enc_out=self.W_txt(txt_enc_out)
 
 
