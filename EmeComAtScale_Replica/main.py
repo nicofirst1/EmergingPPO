@@ -1,12 +1,14 @@
+from functools import partial
+
 import torch
 from datasets import load_dataset
 from egg.core import Trainer
-from egg.zoo.emcom_as_ssl.archs import EmComSSLSymbolGame
 from egg.zoo.emcom_as_ssl.utils import get_common_opts
 from transformers import GPT2TokenizerFast, ViTImageProcessor
 
+from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
 from EmeComAtScale_Replica.losses import NTXentLoss
-from modeling import Sender, Receiver
+from modeling import Sender, Receiver, EmComSSLSymbolGame
 
 
 def loss_fn(sender_socres, img_embds, text_embds):
@@ -43,7 +45,7 @@ def test(args):
 
     sender_in = dataset[:batch_size]["image"]
 
-    message_logits,scores = sender(sender_in)  # [bsz, seqlen, vocab_size]
+    message_logits, scores = sender(sender_in)  # [bsz, seqlen, vocab_size]
 
     # Generate random indices
     indices = torch.randperm(len(dataset))
@@ -55,18 +57,17 @@ def test(args):
         batch = [dataset[i]["image"] for i in batch_indices]
         batches.append(batch)
 
-    receiver_out = receiver(message=message_logits,scores=scores, receiver_input=batches)
+    receiver_out = receiver(message=message_logits, scores=scores, receiver_input=batches)
 
     txt_enc_out = receiver_out['txt_enc_out']
     img_enc_out = receiver_out['img_enc_out']
 
     # repeat txt_enc_out for each distractor
-    #txt_enc_out = txt_enc_out.unsqueeze(dim=1).repeat(1,distractors, 1)
+    # txt_enc_out = txt_enc_out.unsqueeze(dim=1).repeat(1,distractors, 1)
     correct_img = torch.tensor([0, 1])
-    l=loss.modified_ntxent_loss(txt_enc_out,img_enc_out,correct_img)
+    l = loss.modified_ntxent_loss(txt_enc_out, img_enc_out, correct_img)
 
     print(message_logits)
-
 
 
 def main(args):
@@ -87,7 +88,6 @@ def main(args):
     loss = NTXentLoss(
         temperature=1,
         similarity="cosine",
-        use_distributed_negatives=False,
     )
 
     game = EmComSSLSymbolGame(
@@ -108,12 +108,23 @@ def main(args):
     )
 
     dataset = load_dataset('Maysee/tiny-imagenet', split='train')
+    # todo: remove after testing
+    #dataset = dataset.filter(lambda e, i: i < 100, with_indices=True)
+
+    # filter all images where the mode is not RBG
+    dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
+
+    dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
+                          fn_kwargs={"num_distractors": 3, "image_processor": image_processor},
+                          #load_from_cache_file=False
+                          )
 
     # todo add collate_fn (maybe preprocess before?)
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=2,
         shuffle=True,
+        collate_fn=custom_collate_fn,
     )
 
     trainer = Trainer(
@@ -130,4 +141,4 @@ if __name__ == "__main__":
     torch.autograd.set_detect_anomaly(True)
     import sys
 
-    test(sys.argv[1:])
+    main(sys.argv[1:])

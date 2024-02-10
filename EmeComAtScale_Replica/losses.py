@@ -92,40 +92,7 @@ class NTXentLoss:
         acc = (torch.argmax(logits.detach(), dim=1) == labels).float().detach()
         return loss, {"acc": acc}
 
-    def compute_similarity(self, text_embeddings, image_embeddings):
-        """
-        Compute the cosine similarity between text and image embeddings.
 
-        Args:
-        text_embeddings: Tensor of shape [batch_size, txt_features].
-        image_embeddings: Tensor of shape [batch_size, num_images, img_features].
-
-        Returns:
-        Tensor of shape [batch_size, num_images] representing the similarity
-        between each text embedding and each image embedding.
-        """
-
-        # Normalize the embeddings to have unit length
-        text_embeddings = F.normalize(text_embeddings, p=2, dim=1)
-
-        # Reshape image embeddings to align with text embeddings
-        batch_size, num_images, img_features = image_embeddings.shape
-
-        similarity_matrix=[]
-
-        for i in range(batch_size):
-            img_emb=image_embeddings[i,:,:]
-            img_emb=F.normalize(img_emb, p=2, dim=1)
-            txt_emb=text_embeddings[i,:]
-            v=torch.matmul(txt_emb, img_emb.t())
-            similarity_matrix.append(v)
-
-        # Compute similarity
-        # Reshape text embeddings to (batch_size, 1, txt_features) for broadcasting
-        similarity_matrix = torch.stack(similarity_matrix)
-
-
-        return similarity_matrix
 
     def modified_ntxent_loss(self, text_embeddings, image_embeddings, correct_image, temperature=1.0):
         """
@@ -171,7 +138,15 @@ class NTXentLoss:
         predicted_image = torch.argmax(similarities, dim=1)
         accuracy = (predicted_image == correct_image).float().mean()
 
-        return loss, predicted_image, accuracy
+        aux_info = {
+            "acc": accuracy,
+            "predicted_image": predicted_image,
+
+        }
+
+        print(accuracy)
+
+        return loss, aux_info
 
     def __call__(
         self,
