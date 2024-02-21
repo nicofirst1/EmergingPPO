@@ -32,7 +32,7 @@ def prepare_inputs_for_generation(orig_fn, input_ids, **model_kwargs):
 class Sender(nn.Module):
     """Sender/receiver agent based on vision encoder decoder"""
 
-    def __init__(self, tokenizer, image_processor):
+    def __init__(self,img_encoder, tokenizer, image_processor):
         """TODO: to be defined."""
         nn.Module.__init__(self)
 
@@ -43,14 +43,17 @@ class Sender(nn.Module):
         )
         config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
 
-        self.model = VisionEncoderDecoderModel(config=config)
+        model = VisionEncoderDecoderModel(config=config)
+
+        self.encoder=img_encoder
+        self.decoder=model.decoder
 
         # force decoder to use xattention
-        self.model.decoder.prepare_inputs_for_generation = partial(prepare_inputs_for_generation,
-                                                                   self.model.decoder.prepare_inputs_for_generation)
+        self.decoder.prepare_inputs_for_generation = partial(prepare_inputs_for_generation,
+                                                                   self.decoder.prepare_inputs_for_generation)
 
         # # Initialize weights for decoder
-        # self.model.decoder.init_weights()
+        # self.decoder.init_weights()
 
         # We can use our own here.
         self.tokenizer = tokenizer
@@ -75,7 +78,7 @@ class Sender(nn.Module):
 
     ):
 
-        if len(sender_input.shape) < 4:
+        if isinstance(sender_input,list):
             pixel_values = self.image_processor(
                 sender_input, return_tensor="pt"
             ).pixel_values
@@ -86,7 +89,7 @@ class Sender(nn.Module):
             pixel_values = sender_input
 
         # forward pass through the encoder
-        enc_out = self.model.encoder(pixel_values=pixel_values)
+        enc_out = self.encoder(pixel_values=pixel_values)
 
         # create the decoder input
         bos_token_id = self.tokenizer.bos_token_id
@@ -103,7 +106,7 @@ class Sender(nn.Module):
 
         # forward generation through the decoder
         # todo: check if xattention by checking if dec has enc out
-        gen_out = self.model.decoder.greedy_search(
+        gen_out = self.decoder.greedy_search(
             decoder_input_ids,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
@@ -124,14 +127,13 @@ class Sender(nn.Module):
 class Receiver(nn.Module):
     """Sender/receiver agent based on vision encoder decoder"""
 
-    def __init__(self, tokenizer, image_processor):
+    def __init__(self, img_encoder, tokenizer, image_processor):
         """TODO: to be defined."""
         nn.Module.__init__(self)
 
         config_decoder = GPT2Config()
 
-        # todo: freeze vit
-        self.img_encoder = ViTModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+        self.img_encoder = img_encoder
         self.text_encoder = GPT2Model(config=config_decoder)
 
         # We can use our own here.
@@ -157,7 +159,7 @@ class Receiver(nn.Module):
             scores,
             receiver_input
     ):
-        if len(receiver_input.shape) < 5:
+        if isinstance(receiver_input,list):
 
             pixel_values = [self.image_processor(ri, return_tensor="pt").pixel_values for ri in receiver_input]
             pixel_values = [torch.tensor(pv) for pv in pixel_values]
