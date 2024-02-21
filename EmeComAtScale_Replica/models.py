@@ -9,7 +9,7 @@ import torch.nn as nn
 from egg.core import SenderReceiverContinuousCommunication
 from torch.nn import Parameter
 from transformers import GPT2Config, MaxLengthCriteria, GPT2Model, GPT2LMHeadModel, ViTModel, \
-    GPT2TokenizerFast, StoppingCriteriaList
+    GPT2TokenizerFast, StoppingCriteriaList, PreTrainedTokenizerBase
 
 
 class GubleLogitsProcessor(nn.Module):
@@ -48,8 +48,9 @@ class Sender(nn.Module):
             tokenizer (GPT2TokenizerFast): The tokenizer.
         """
 
-    def __init__(self, img_encoder: ViTModel, tokenizer: GPT2TokenizerFast,
-                 stopping_criteria: Optional[StoppingCriteriaList] = None, ):
+    def __init__(self, img_encoder: ViTModel, tokenizer: PreTrainedTokenizerBase,
+                 stopping_criteria: Optional[StoppingCriteriaList] = None,
+                 vocab_size: int = 6):
         super().__init__()
 
         self.tokenizer = tokenizer
@@ -60,7 +61,8 @@ class Sender(nn.Module):
         self.logit_processor = GubleLogitsProcessor(temperature=1.0)
 
         # init decoder
-        config_decoder = GPT2Config(add_cross_attention=True)
+        config_decoder = GPT2Config(add_cross_attention=True,
+                                    vocab_size=vocab_size,)
         self.decoder = GPT2LMHeadModel(config=config_decoder)
 
         # Force decoder to use cross attention
@@ -112,6 +114,7 @@ class Sender(nn.Module):
         bos_token_id = self.tokenizer.bos_token_id
         batch_size = pixel_values.shape[0]
         decoder_input_ids = torch.full((batch_size, 1), bos_token_id, dtype=torch.long)
+        decoder_input_ids = decoder_input_ids.to(pixel_values.device)
 
         # Forward generation through the decoder
         gen_out = self.decoder.greedy_search(
@@ -137,7 +140,8 @@ class Receiver(nn.Module):
     Sender/receiver agent based on vision encoder decoder
     """
 
-    def __init__(self, img_encoder: ViTModel, tokenizer: GPT2TokenizerFast, linear_dim: int = 123):
+    def __init__(self, img_encoder: ViTModel, tokenizer: PreTrainedTokenizerBase, linear_dim: int = 123,
+                 vocab_size: int = 6):
         """
         Initialize the Receiver with an image encoder, tokenizer, and linear dimension.
 
@@ -152,13 +156,13 @@ class Receiver(nn.Module):
         self.tokenizer = tokenizer
 
         # decoder
-        config_decoder = GPT2Config()
+        config_decoder = GPT2Config(vocab_size=vocab_size)
         self.text_encoder = GPT2Model(config=config_decoder)
 
         # linear layers
         self.W_img = nn.Linear(self.img_encoder.config.hidden_size, linear_dim)
         self.W_txt = nn.Linear(self.text_encoder.embed_dim, linear_dim)
-        self.text_embedding = nn.Linear(self.tokenizer.vocab_size, self.text_encoder.config.hidden_size)
+        self.text_embedding = nn.Linear(vocab_size, self.text_encoder.config.hidden_size)
 
     def pool_txt(self, h_read: torch.Tensor):
         """
@@ -216,20 +220,12 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
         super(EmComSSLSymbolGame, self).__init__(*args, **kwargs)
 
     def forward(self, sender_input, labels, receiver_input, aux_input=None):
-
         message, scores = self.sender(sender_input)
         txt_enc_out, img_enc_out = self.receiver(scores, receiver_input)
 
         loss, aux_info = self.loss.modified_ntxent_loss(
             txt_enc_out, img_enc_out, labels
         )
-
-        if hasattr(self.sender, "temperature"):
-            if isinstance(self.sender.temperature, torch.nn.Parameter):
-                temperature = self.sender.temperature.detach()
-            else:
-                temperature = torch.Tensor([self.sender.temperature])
-            aux_info["temperature"] = temperature
 
         if not self.training:
             aux_info["message"] = message

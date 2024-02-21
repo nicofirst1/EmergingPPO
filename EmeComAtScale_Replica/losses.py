@@ -130,19 +130,21 @@ class NTXentLoss:
 
         # get positive and negative samples
         positive_samples = logits[range(batch_size), correct_image]
-        negative_samples = -logits[labels == 0]
+        negative_samples = logits[labels == 0]
 
         # Compute the loss
-        loss = positive_samples.mean()+negative_samples.mean()
+        loss = positive_samples.mean()-negative_samples.mean()
 
         predicted_image = torch.argmax(similarities, dim=1)
         accuracy = (predicted_image == correct_image).float().mean()
 
         aux_info = {
             "acc": accuracy,
-            "predicted_image": predicted_image,
-
+            "acc-random": accuracy- 1 / num_images,
+         #   "predicted_image": predicted_image,
         }
+
+        aux_info={k:v.unsqueeze(0) for k,v in aux_info.items()}
 
         print(accuracy)
 
