@@ -17,8 +17,8 @@ def test():
     # initialize the  models
     tokenizer, image_processor, img_encoder = initialize_pretrained_models()
 
-    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer, image_processor=image_processor)
-    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer, image_processor=image_processor)
+    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer)
+    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer)
 
 
     sender_w=copy.deepcopy(list(sender.parameters()))

@@ -2,108 +2,128 @@
 Transformer-based models for emergent communication
 """
 from functools import partial
-from typing import Iterator
+from typing import Iterator, Tuple, Optional
 
 import torch
 import torch.nn as nn
 from egg.core import SenderReceiverContinuousCommunication
 from torch.nn import Parameter
-from transformers import GPT2Config, MaxLengthCriteria, LogitsProcessor, GPT2Model, GPT2LMHeadModel
+from transformers import GPT2Config, MaxLengthCriteria, GPT2Model, GPT2LMHeadModel, ViTModel, \
+    GPT2TokenizerFast, StoppingCriteriaList
 
 
-class GubleLogitsProcessor(LogitsProcessor):
+class GubleLogitsProcessor(nn.Module):
+    """
+    A module that applies the Gumbel-Softmax trick to the input scores.
 
-    def __init__(self, temperature=1.0, hard=True):
+    Args:
+        temperature (float): The temperature for the Gumbel-Softmax trick. Default is 1.0.
+        hard (bool): If True, the returned samples will be one-hot, otherwise they will be probabilities from the Gumbel-Softmax distribution. Default is True.
+    """
+
+    def __init__(self, temperature: float = 1.0, hard: bool = True):
+        super().__init__()
         self.temperature = temperature
         self.hard = hard
 
-    def __call__(self, input_ids: torch.LongTensor, scores: torch.FloatTensor) -> torch.FloatTensor:
-        return torch.nn.functional.gumbel_softmax(scores, tau=self.temperature, hard=self.hard)
+    def forward(self, scores: torch.Tensor, next_token_logits) -> torch.Tensor:
+        """
+        Apply the Gumbel-Softmax trick to the input scores.
 
+        Args:
+            scores (torch.Tensor): The input scores/logits.
 
-def prepare_inputs_for_generation(orig_fn, input_ids, **model_kwargs):
-    out = orig_fn(input_ids, **model_kwargs)
-
-    if "encoder_hidden_states" in model_kwargs and "encoder_hidden_states" not in out:
-        out["encoder_hidden_states"] = model_kwargs["encoder_hidden_states"]
-
-    return out
+        Returns:
+            torch.Tensor: The processed scores.
+        """
+        return torch.nn.functional.gumbel_softmax(next_token_logits, tau=self.temperature, hard=self.hard)
 
 
 class Sender(nn.Module):
-    """Sender/receiver agent based on vision encoder decoder"""
+    """
+        Sender/receiver agent based on vision encoder decoder.
 
-    def __init__(self, img_encoder, tokenizer, image_processor):
-        """TODO: to be defined."""
-        nn.Module.__init__(self)
+        Args:
+            img_encoder (ViTModel): The image encoder.
+            tokenizer (GPT2TokenizerFast): The tokenizer.
+        """
 
-        config_decoder = GPT2Config(
-            add_cross_attention=True,
+    def __init__(self, img_encoder: ViTModel, tokenizer: GPT2TokenizerFast,
+                 stopping_criteria: Optional[StoppingCriteriaList] = None, ):
+        super().__init__()
 
-        )
-
+        self.tokenizer = tokenizer
         self.encoder = img_encoder
+
+        # Define stopping criteria and logits processor
+        self.stopping_criteria = MaxLengthCriteria(max_length=6) if stopping_criteria is None else stopping_criteria
+        self.logit_processor = GubleLogitsProcessor(temperature=1.0)
+
+        # init decoder
+        config_decoder = GPT2Config(add_cross_attention=True)
         self.decoder = GPT2LMHeadModel(config=config_decoder)
 
-        # force decoder to use xattention
-        self.decoder.prepare_inputs_for_generation = partial(prepare_inputs_for_generation,
+        # Force decoder to use cross attention
+        self.decoder.prepare_inputs_for_generation = partial(self.prepare_inputs_for_generation,
                                                              self.decoder.prepare_inputs_for_generation)
 
         # Initialize weights for decoder
         self.decoder.init_weights()
 
-        # We can use our own here.
-        self.tokenizer = tokenizer
-        self.image_processor = image_processor
+    @staticmethod
+    def prepare_inputs_for_generation(orig_fn, input_ids: torch.Tensor, **model_kwargs) -> dict:
+        """
+        Prepare the inputs for generation.
+
+        Args:
+            orig_fn (Callable): The original function for preparing inputs for generation.
+            input_ids (torch.Tensor): The input IDs for the decoder.
+            model_kwargs (dict): Additional keyword arguments for the model.
+
+        Returns:
+            dict: The prepared inputs for generation.
+        """
+        out = orig_fn(input_ids, **model_kwargs)
+
+        if "encoder_hidden_states" in model_kwargs and "encoder_hidden_states" not in out:
+            out["encoder_hidden_states"] = model_kwargs["encoder_hidden_states"]
+
+        return out
 
     def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
         return self.decoder.parameters(recurse)
 
-    def forward(
-            self,
-            sender_input=None,
-            aux_input=None,  # input to both sender/receiver, unused atm
+    def forward(self, sender_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass through the Sender.
 
-    ):
+        Args:
+            sender_input (torch.Tensor, optional): The input to the Sender. Default is None.
 
-        if isinstance(sender_input, list):
-            pixel_values = self.image_processor(
-                sender_input, return_tensor="pt"
-            ).pixel_values
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: The messages and scores.
+        """
+        pixel_values = sender_input
 
-            # cast to tensor
-            pixel_values = torch.tensor(pixel_values)
-        else:
-            pixel_values = sender_input
-
-        # forward pass through the encoder
+        # Forward pass through the encoder
         enc_out = self.encoder(pixel_values=pixel_values)
 
-        # create the decoder input
+        # Create the decoder input
         bos_token_id = self.tokenizer.bos_token_id
         batch_size = pixel_values.shape[0]
-        decoder_input_ids = torch.full(
-            (batch_size, 1), bos_token_id, dtype=torch.long
-        )
+        decoder_input_ids = torch.full((batch_size, 1), bos_token_id, dtype=torch.long)
 
-        # define stopping criteria and logits processor
-        stopping_criteria = MaxLengthCriteria(
-            max_length=6
-        )
-        logit_processor = GubleLogitsProcessor(temperature=1.0)
-
-        # forward generation through the decoder
-        # todo: check if xattention by checking if dec has enc out
+        # Forward generation through the decoder
         gen_out = self.decoder.greedy_search(
             decoder_input_ids,
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
             output_scores=True,
             encoder_outputs=enc_out,
-            encoder_hidden_states=enc_out.last_hidden_state,  # enables Xattention
-            stopping_criteria=stopping_criteria,
+            encoder_hidden_states=enc_out.last_hidden_state,  # enables cross attention
+            stopping_criteria=self.stopping_criteria,
             return_dict_in_generate=True,
-            logits_processor=logit_processor,
+            logits_processor=self.logit_processor,
         )
 
         messages = gen_out.sequences
@@ -113,58 +133,77 @@ class Sender(nn.Module):
 
 
 class Receiver(nn.Module):
-    """Sender/receiver agent based on vision encoder decoder"""
+    """
+    Sender/receiver agent based on vision encoder decoder
+    """
 
-    def __init__(self, img_encoder, tokenizer, image_processor, linear_dim=123):
-        """TODO: to be defined."""
-        nn.Module.__init__(self)
+    def __init__(self, img_encoder: ViTModel, tokenizer: GPT2TokenizerFast, linear_dim: int = 123):
+        """
+        Initialize the Receiver with an image encoder, tokenizer, and linear dimension.
 
-        config_decoder = GPT2Config()
+        Args:
+            img_encoder (ViTModel): The image encoder.
+            tokenizer (GPT2TokenizerFast): The tokenizer.
+            linear_dim (int): The linear dimension for the image and text encoders.
+        """
+        super().__init__()
 
         self.img_encoder = img_encoder
-        self.text_encoder = GPT2Model(config=config_decoder)
-
-        # We can use our own here.
         self.tokenizer = tokenizer
 
-        self.image_processor = image_processor
+        # decoder
+        config_decoder = GPT2Config()
+        self.text_encoder = GPT2Model(config=config_decoder)
 
-        # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
-        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, linear_dim)  # dummy dimensions
+        # linear layers
+        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, linear_dim)
         self.W_txt = nn.Linear(self.text_encoder.embed_dim, linear_dim)
         self.text_embedding = nn.Linear(self.tokenizer.vocab_size, self.text_encoder.config.hidden_size)
 
+    def pool_txt(self, h_read: torch.Tensor):
+        """
+        Pool the text read.
 
-    def pool_txt(self, h_read):
-        # TODO pool on sequence dimension, or special token?
+        Args:
+            h_read (torch.Tensor): The text read.
+
+        Returns:
+            torch.Tensor: The pooled text read.
+        """
         return h_read.mean(dim=1)
 
-    def pool_img(self, h_image):
-        # TODO pool on patches dimension, or special token?
+    def pool_img(self, h_image: torch.Tensor):
+        """
+        Pool the image.
+
+        Args:
+            h_image (torch.Tensor): The image.
+
+        Returns:
+            torch.Tensor: The pooled image.
+        """
         return h_image.mean(dim=1)
 
-    def forward(
-            self,
-            scores,
-            receiver_input
-    ):
-        if isinstance(receiver_input, list):
+    def forward(self, scores: torch.Tensor, receiver_input: torch.Tensor):
+        """
+        Forward pass through the Receiver.
 
-            pixel_values = [self.image_processor(ri, return_tensor="pt").pixel_values for ri in receiver_input]
-            pixel_values = [torch.tensor(pv) for pv in pixel_values]
-        else:
-            pixel_values = receiver_input
+        Args:
+            scores (torch.Tensor): The sender' scores for message creation.
+            receiver_input (torch.Tensor): The input to the Receiver.
 
-        # [batch_size,distractors, channels, height, width]
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: The text and image encoder outputs.
+        """
 
-        # forward pass through the encoder
+        # image encoding
+        pixel_values = receiver_input
         img_enc_out = [self.img_encoder(pixel_values=pv) for pv in pixel_values]
         img_enc_out = [self.pool_img(e.last_hidden_state) for e in img_enc_out]
         img_enc_out = [self.W_img(e) for e in img_enc_out]
         img_enc_out = torch.stack(img_enc_out)
 
-        # encode the message (one hot encoding)
-        # txt_enc_out = self.text_encoder(input_ids=message)
+        # text encoding
         txt_enc_out = self.text_embedding(scores)
         txt_enc_out = self.pool_txt(txt_enc_out)
         txt_enc_out = self.W_txt(txt_enc_out)
