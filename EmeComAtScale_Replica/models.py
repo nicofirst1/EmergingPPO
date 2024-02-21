@@ -2,12 +2,13 @@
 Transformer-based models for emergent communication
 """
 from functools import partial
+from typing import Iterator
 
 import torch
 import torch.nn as nn
 from egg.core import SenderReceiverContinuousCommunication
-from transformers import VisionEncoderDecoderModel, ViTConfig, \
-    VisionEncoderDecoderConfig, GPT2Config, MaxLengthCriteria, LogitsProcessor, ViTModel, GPT2Model
+from torch.nn import Parameter
+from transformers import GPT2Config, MaxLengthCriteria, LogitsProcessor, GPT2Model, GPT2LMHeadModel
 
 
 class GubleLogitsProcessor(LogitsProcessor):
@@ -32,44 +33,31 @@ def prepare_inputs_for_generation(orig_fn, input_ids, **model_kwargs):
 class Sender(nn.Module):
     """Sender/receiver agent based on vision encoder decoder"""
 
-    def __init__(self,img_encoder, tokenizer, image_processor):
+    def __init__(self, img_encoder, tokenizer, image_processor):
         """TODO: to be defined."""
         nn.Module.__init__(self)
 
-        config_encoder = ViTConfig.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
         config_decoder = GPT2Config(
             add_cross_attention=True,
 
         )
-        config = VisionEncoderDecoderConfig.from_encoder_decoder_configs(config_encoder, config_decoder)
 
-        model = VisionEncoderDecoderModel(config=config)
-
-        self.encoder=img_encoder
-        self.decoder=model.decoder
+        self.encoder = img_encoder
+        self.decoder = GPT2LMHeadModel(config=config_decoder)
 
         # force decoder to use xattention
         self.decoder.prepare_inputs_for_generation = partial(prepare_inputs_for_generation,
-                                                                   self.decoder.prepare_inputs_for_generation)
+                                                             self.decoder.prepare_inputs_for_generation)
 
-        # # Initialize weights for decoder
-        # self.decoder.init_weights()
+        # Initialize weights for decoder
+        self.decoder.init_weights()
 
         # We can use our own here.
         self.tokenizer = tokenizer
         self.image_processor = image_processor
 
-        # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
-        self.W_img = nn.Linear(123, 123)  # dummy dimensions
-        self.W_txt = nn.Linear(234, 123)
-
-    def pool_txt(self, h_read):
-        # TODO pool on sequence dimension, or special token?
-        return h_read.mean(dim=1)
-
-    def pool_img(self, h_image):
-        # TODO pool on patches dimension, or special token?
-        return h_image.mean(dim=1)
+    def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
+        return self.decoder.parameters(recurse)
 
     def forward(
             self,
@@ -78,7 +66,7 @@ class Sender(nn.Module):
 
     ):
 
-        if isinstance(sender_input,list):
+        if isinstance(sender_input, list):
             pixel_values = self.image_processor(
                 sender_input, return_tensor="pt"
             ).pixel_values
@@ -127,7 +115,7 @@ class Sender(nn.Module):
 class Receiver(nn.Module):
     """Sender/receiver agent based on vision encoder decoder"""
 
-    def __init__(self, img_encoder, tokenizer, image_processor):
+    def __init__(self, img_encoder, tokenizer, image_processor, linear_dim=123):
         """TODO: to be defined."""
         nn.Module.__init__(self)
 
@@ -142,9 +130,10 @@ class Receiver(nn.Module):
         self.image_processor = image_processor
 
         # TODO fix dimensions according to last hidden of ViT, GPT-2, respectively
-        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, 123)  # dummy dimensions
-        self.W_txt = nn.Linear(self.text_encoder.embed_dim, 123)
+        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, linear_dim)  # dummy dimensions
+        self.W_txt = nn.Linear(self.text_encoder.embed_dim, linear_dim)
         self.text_embedding = nn.Linear(self.tokenizer.vocab_size, self.text_encoder.config.hidden_size)
+
 
     def pool_txt(self, h_read):
         # TODO pool on sequence dimension, or special token?
@@ -159,7 +148,7 @@ class Receiver(nn.Module):
             scores,
             receiver_input
     ):
-        if isinstance(receiver_input,list):
+        if isinstance(receiver_input, list):
 
             pixel_values = [self.image_processor(ri, return_tensor="pt").pixel_values for ri in receiver_input]
             pixel_values = [torch.tensor(pv) for pv in pixel_values]
@@ -193,7 +182,7 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
         txt_enc_out, img_enc_out = self.receiver(scores, receiver_input)
 
         loss, aux_info = self.loss.modified_ntxent_loss(
-            txt_enc_out,img_enc_out,labels
+            txt_enc_out, img_enc_out, labels
         )
 
         if hasattr(self.sender, "temperature"):
@@ -205,7 +194,6 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
 
         if not self.training:
             aux_info["message"] = message
-
 
         logging_strategy = (
             self.train_logging_strategy if self.training else self.test_logging_strategy
