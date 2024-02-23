@@ -1,13 +1,13 @@
 import torch
 from datasets import load_dataset
 from egg.core import Trainer, ProgressBarLogger
-from egg.zoo.emcom_as_ssl.utils import get_common_opts
 from torch.utils.data import DataLoader
-from transformers import GPT2TokenizerFast, BertTokenizerFast
+from transformers import BertTokenizerFast, MaxLengthCriteria
 
 from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
 from EmeComAtScale_Replica.losses import NTXentLoss
-from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file
+from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
+from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
 from models import Sender, Receiver, EmComSSLSymbolGame
 
 
@@ -15,40 +15,46 @@ def main(args):
     opts = get_common_opts(params=args)
 
     # add mac m1
-    opts.device=  torch.device("mps")
-
+    # opts.device = torch.device("mps")
     print(f"{opts}\n")
 
-    image_processor, img_encoder = initialize_pretrained_models()
+    image_processor, img_encoder = initialize_pretrained_models(opts.vision_chk)
 
     # tokenizer
-    vocab_file=generate_vocab_file(opts.vocab_size)
+    vocab_file = generate_vocab_file(opts.vocab_size)
     tokenizer = BertTokenizerFast(vocab_file=vocab_file)
     tokenizer.bos_token_id = tokenizer.cls_token_id
 
+    # stopping criteria as maxlength for decoder
+    stopping_criteria = MaxLengthCriteria(max_length=opts.max_len)
 
-    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer, vocab_size=opts.vocab_size)
-    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer,vocab_size=opts.vocab_size)
+    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer, vocab_size=opts.vocab_size,
+                    stopping_criteria=stopping_criteria, gs_temperature=opts.gs_temperature)
+    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer, vocab_size=opts.vocab_size,
+                        linear_dim=opts.projection_output_dim)
 
     sender.to(opts.device)
     receiver.to(opts.device)
 
+    # todo : use different losses
     loss = NTXentLoss(
-        temperature=1,
-        similarity="cosine",
+        temperature=opts.loss_temperature,
+        similarity=opts.similarity,
+        distractors=opts.distractors_num,
     )
 
     game = EmComSSLSymbolGame(
-        sender,
-        receiver,
-        loss,
+        sender=sender,
+        receiver=receiver,
+        loss=loss,
+        distractors=opts.distractors_num
     )
 
     model_parameters = list(sender.parameters()) + list(receiver.parameters())
 
     optimizer = torch.optim.SGD(
         model_parameters,
-        lr=0.0001,
+        lr=opts.lr,
         momentum=0.9,
     )
     # optimizer_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -60,11 +66,12 @@ def main(args):
     # filter all images where the mode is not RBG
     dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
 
+    dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
+
     # preprocess the images
     dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
-                          fn_kwargs={"num_distractors": 3, "image_processor": image_processor},num_proc=2
-                          )
-
+                          fn_kwargs={"num_distractors": opts.distractors_num, "image_processor": image_processor},
+                          num_proc=opts.num_workers)
 
     dataloader = DataLoader(
         dataset,
@@ -74,15 +81,18 @@ def main(args):
 
     )
 
+    # accuracy, loss, cosine similarity, messages
     progress_bar = ProgressBarLogger(n_epochs=opts.n_epochs,
                                      train_data_len=len(dataloader))
+
+    wandb_logger = CustomWandbLogger(opts=opts, mode="offline")
 
     trainer = Trainer(
         game=game,
         optimizer=optimizer,
-       # optimizer_scheduler=optimizer_scheduler,
+        # optimizer_scheduler=optimizer_scheduler,
         train_data=dataloader,
-        callbacks=[progress_bar],
+        callbacks=[progress_bar, wandb_logger],
     )
     trainer.train(n_epochs=opts.n_epochs)
 

@@ -1,0 +1,16 @@
+Traceback (most recent call last):
+  File "/Users/giulia/Desktop/EmergingPPO/EmeComAtScale_Replica/main.py", line 104, in <module>
+    main(sys.argv[1:])
+  File "/Users/giulia/Desktop/EmergingPPO/EmeComAtScale_Replica/main.py", line 97, in main
+    trainer.train(n_epochs=opts.n_epochs)
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/egg/core/trainers.py", line 273, in train
+    train_loss, train_interaction = self.train_epoch()
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/egg/core/trainers.py", line 216, in train_epoch
+    optimized_loss, interaction = self.game(*batch)
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1561, in _call_impl
+    result = forward_call(*args, **kwargs)
+  File "/Users/giulia/Desktop/EmergingPPO/EmeComAtScale_Replica/models.py", line 223, in forward
+    message, scores = self.sender(sender_input)
+KeyboardInterrupt

@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
+    data = self._next_data()
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/torch/utils/data/dataloader.py", line 675, in _next_data
+    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
+  File "/Users/giulia/Desktop/EmergingPPO/venv/lib/python3.9/site-packages/torch/utils/data/_utils/fetch.py", line 54, in fetch
+    return self.collate_fn(data)
+  File "/Users/giulia/Desktop/EmergingPPO/EmeComAtScale_Replica/data.py", line 51, in custom_collate_fn
+    sender_input = receiver_input[torch.arange(receiver_input.shape[0]), labels]
+IndexError: tensors used as indices must be long, int, byte or bool tensors
