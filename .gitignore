@@ -7,3 +7,5 @@ __pycache__
 /Nico Exps/
 
 EmeComAtScale_Replica/vocab.txt
+
+EmeComAtScale_Replica/wandb/

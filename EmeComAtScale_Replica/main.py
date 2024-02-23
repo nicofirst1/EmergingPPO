@@ -61,12 +61,14 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
+    # todo: load all splits
     dataset = load_dataset('Maysee/tiny-imagenet', split='train')
 
     # filter all images where the mode is not RBG
     dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
 
-    dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
+    # #todo: comment this out
+    # dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
 
     # preprocess the images
     dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
@@ -81,11 +83,15 @@ def main(args):
 
     )
 
-    # accuracy, loss, cosine similarity, messages
+    ## CALLBACKS
     progress_bar = ProgressBarLogger(n_epochs=opts.n_epochs,
                                      train_data_len=len(dataloader))
 
-    wandb_logger = CustomWandbLogger(opts=opts, mode="offline")
+
+    wandb_logger = CustomWandbLogger(opts=opts,
+                                     # todo: comment out
+                                    # mode="offline"
+                                     )
 
     trainer = Trainer(
         game=game,
