@@ -5,9 +5,15 @@ from egg.zoo.emcom_as_ssl.utils import get_common_opts
 from torch.utils.data import DataLoader
 from transformers import GPT2TokenizerFast, BertTokenizerFast
 
-from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
-from EmeComAtScale_Replica.losses import NTXentLoss
-from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file
+try:
+    from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
+    from EmeComAtScale_Replica.losses import NTXentLoss
+    from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file
+except ModuleNotFoundError:
+    from data import emecom_map, custom_collate_fn
+    from losses import NTXentLoss
+    from utils import initialize_pretrained_models, generate_vocab_file
+
 from models import Sender, Receiver, EmComSSLSymbolGame
 
 
