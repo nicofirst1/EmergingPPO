@@ -50,7 +50,7 @@ class Sender(nn.Module):
 
     def __init__(self, img_encoder: ViTModel, tokenizer: PreTrainedTokenizerBase,
                  stopping_criteria: Optional[StoppingCriteriaList] = None,
-                 vocab_size: int = 6):
+                 vocab_size: int = 6, gs_temperature: float = 1.0):
         super().__init__()
 
         self.tokenizer = tokenizer
@@ -58,11 +58,11 @@ class Sender(nn.Module):
 
         # Define stopping criteria and logits processor
         self.stopping_criteria = MaxLengthCriteria(max_length=6) if stopping_criteria is None else stopping_criteria
-        self.logit_processor = GubleLogitsProcessor(temperature=1.0)
+        self.logit_processor = GubleLogitsProcessor(temperature=gs_temperature)
 
         # init decoder
         config_decoder = GPT2Config(add_cross_attention=True,
-                                    vocab_size=vocab_size,)
+                                    vocab_size=vocab_size, )
         self.decoder = GPT2LMHeadModel(config=config_decoder)
 
         # Force decoder to use cross attention
@@ -202,12 +202,21 @@ class Receiver(nn.Module):
 
         # image encoding
         pixel_values = receiver_input
-        img_enc_out = [self.img_encoder(pixel_values=pv) for pv in pixel_values]
-        img_enc_out = [self.pool_img(e.last_hidden_state) for e in img_enc_out]
-        img_enc_out = [self.W_img(e) for e in img_enc_out]
-        img_enc_out = torch.stack(img_enc_out)
 
-        # text encoding
+        if pixel_values.ndim > 4:
+            # using distractors [batch size, distractors, img_dim x3]
+            img_enc_out = [self.img_encoder(pixel_values=pv) for pv in pixel_values]
+            img_enc_out = [self.pool_img(e.last_hidden_state) for e in img_enc_out]
+            img_enc_out = [self.W_img(e) for e in img_enc_out]
+            img_enc_out = torch.stack(img_enc_out)
+        else:
+            # no distractors [batch size, img_dim x3]
+
+            img_enc_out = self.img_encoder(pixel_values).last_hidden_state
+            img_enc_out = self.pool_img(img_enc_out)
+            img_enc_out = self.W_img(img_enc_out)
+
+            # text encoding
         txt_enc_out = self.text_embedding(scores)
         txt_enc_out = self.pool_txt(txt_enc_out)
         txt_enc_out = self.W_txt(txt_enc_out)
@@ -216,15 +225,21 @@ class Receiver(nn.Module):
 
 
 class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, distractors, *args, **kwargs):
         super(EmComSSLSymbolGame, self).__init__(*args, **kwargs)
+        self.distractors = distractors
 
     def forward(self, sender_input, labels, receiver_input, aux_input=None):
+
+        if self.distractors < 1:
+            # if no distractors present input is the same for both
+            sender_input = receiver_input
+
         message, scores = self.sender(sender_input)
         txt_enc_out, img_enc_out = self.receiver(scores, receiver_input)
 
-        loss, aux_info = self.loss.modified_ntxent_loss(
-            txt_enc_out, img_enc_out, labels
+        loss, aux_info = self.loss(
+            img_enc_out, txt_enc_out, message, scores, labels
         )
 
         if not self.training:

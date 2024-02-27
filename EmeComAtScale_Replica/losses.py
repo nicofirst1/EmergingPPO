@@ -1,6 +1,7 @@
 from typing import Tuple, Dict, Any
-from torch.nn import functional as F
+
 import torch
+from torch.nn import functional as F
 
 
 class NTXentLoss:
@@ -34,24 +35,26 @@ class NTXentLoss:
     """
 
     def __init__(
-        self,
-        temperature: float = 1.0,
-        similarity: str = "cosine",
+            self,
+            temperature: float = 1.0,
+            similarity: str = "cosine",
+            distractors: int = -1
     ):
         self.temperature = temperature
+        self.distractors = distractors
 
         similarities = {"cosine", "dot"}
         assert (
-            similarity.lower() in similarities
+                similarity.lower() in similarities
         ), f"Cannot recognize similarity function {similarity}"
         self.similarity = similarity
 
     @staticmethod
     def ntxent_loss(
-        sender_output: torch.Tensor,
-        receiver_output: torch.Tensor,
-        temperature: float = 1.0,
-        similarity: str = "cosine",
+            sender_output: torch.Tensor,
+            receiver_output: torch.Tensor,
+            temperature: float = 1.0,
+            similarity: str = "cosine",
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
 
         if sender_output.shape != receiver_output.shape:
@@ -66,7 +69,7 @@ class NTXentLoss:
         if similarity == "cosine":
             similarity_f = torch.nn.CosineSimilarity(dim=2)
             similarity_matrix = (
-                similarity_f(input.unsqueeze(1), input.unsqueeze(0)) / temperature
+                    similarity_f(input.unsqueeze(1), input.unsqueeze(0)) / temperature
             )
         elif similarity == "dot":
             similarity_matrix = input @ input.t()
@@ -91,8 +94,6 @@ class NTXentLoss:
 
         acc = (torch.argmax(logits.detach(), dim=1) == labels).float().detach()
         return loss, {"acc": acc}
-
-
 
     def modified_ntxent_loss(self, text_embeddings, image_embeddings, correct_image, temperature=1.0):
         """
@@ -133,34 +134,43 @@ class NTXentLoss:
         negative_samples = logits[labels == 0]
 
         # Compute the loss
-        loss = positive_samples.mean()-negative_samples.mean()
+        loss = positive_samples.mean() - negative_samples.mean()
 
         predicted_image = torch.argmax(similarities, dim=1)
         accuracy = (predicted_image == correct_image).float().mean()
 
         aux_info = {
             "acc": accuracy,
-            "acc-random": accuracy- 1 / num_images,
-         #   "predicted_image": predicted_image,
+            "acc-random": accuracy - 1 / num_images,
+            #   "predicted_image": predicted_image,
         }
 
-        aux_info={k:v.unsqueeze(0) for k,v in aux_info.items()}
+        aux_info = {k: v.unsqueeze(0) for k, v in aux_info.items()}
 
         print(accuracy)
 
         return loss, aux_info
 
     def __call__(
-        self,
-        _sender_input,
-        message,
-        _receiver_input,
-        receiver_output,
-        _labels,
-        _aux_input,
+            self,
+            img_encoding,
+            text_encoding,
+            sender_message,
+            sender_socres,
+            labels,
     ):
-        return self.modified_ntxent_loss(
-            message,
-            receiver_output,
-            temperature=self.temperature,
-        )
+
+        if self.distractors < 1:
+            return self.ntxent_loss(
+                img_encoding,
+                text_encoding,
+                temperature=self.temperature,
+                similarity=self.similarity,
+            )
+        else:
+            return self.modified_ntxent_loss(
+                img_encoding,
+                text_encoding,
+                labels,
+                temperature=self.temperature,
+            )
