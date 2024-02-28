@@ -76,7 +76,7 @@ def main(args):
     dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
 
     # #todo: comment this out
-    # dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
+    #dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
 
     # preprocess the images
     dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
@@ -103,7 +103,8 @@ def main(args):
                                     # mode="offline"
                                      )
 
-    wandb.watch(game)
+    # wandb.watch(game)
+    wandb.watch((sender, receiver), log_freq=1000, log_graph=True)
 
     trainer = Trainer(
         game=game,

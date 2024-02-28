@@ -9,3 +9,5 @@ __pycache__
 EmeComAtScale_Replica/vocab.txt
 
 EmeComAtScale_Replica/wandb/
+
+vocab.txt
