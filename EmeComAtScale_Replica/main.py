@@ -3,6 +3,7 @@ from datasets import load_dataset
 from egg.core import Trainer, ProgressBarLogger
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
+import wandb
 
 try:
     from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
@@ -95,10 +96,14 @@ def main(args):
                                      train_data_len=len(dataloader))
 
 
-    wandb_logger = CustomWandbLogger(opts=opts,
+    wandb_logger = CustomWandbLogger(entity='emergingtransformer',
+                                     project='EmergingPPO',
+                                     opts=opts,
                                      # todo: comment out
                                     # mode="offline"
                                      )
+
+    wandb.watch(game)
 
     trainer = Trainer(
         game=game,

@@ -26,7 +26,7 @@ class CustomWandbLogger(WandbLogger):
     def on_epoch_end(self, loss: float, logs: Interaction, epoch: int):
 
         acc = logs.aux['acc'].mean()
-        loss = loss.detach()
+        # loss = loss.detach()
 
         log_dict = dict(
             train_loss=loss,
