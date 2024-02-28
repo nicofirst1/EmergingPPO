@@ -1,5 +1,4 @@
 import torch
-from datasets import load_dataset
 from egg.core import Trainer, ProgressBarLogger
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
@@ -13,7 +12,7 @@ try:
 except ModuleNotFoundError:
     from data import emecom_map, custom_collate_fn
     from losses import NTXentLoss
-    from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
+    from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts, load_and_preprocess_dataset
     from utils_logs import CustomWandbLogger
 
 from models import Sender, Receiver, EmComSSLSymbolGame
@@ -26,7 +25,7 @@ def main(args):
     # opts.device = torch.device("mps")
     print(f"{opts}\n")
 
-    image_processor, img_encoder = initialize_pretrained_models(opts.vision_chk)
+    img_encoder = initialize_pretrained_models(opts.vision_chk)
 
     # tokenizer
     vocab_file = generate_vocab_file(opts.vocab_size)
@@ -70,18 +69,7 @@ def main(args):
     # )
 
     # todo: load all splits
-    dataset = load_dataset('Maysee/tiny-imagenet', split='train')
-
-    # filter all images where the mode is not RBG
-    dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
-
-    # #todo: comment this out
-    #dataset = dataset.filter(lambda e, i: i < 105, with_indices=True)
-
-    # preprocess the images
-    dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
-                          fn_kwargs={"num_distractors": opts.distractors_num, "image_processor": image_processor},
-                          num_proc=opts.num_workers)
+    load_and_preprocess_dataset('Maysee/tiny-imagenet', 'train', opts.vision_chk, num_distractors=opts.distractors_num, limit=None)
 
     dataloader = DataLoader(
         dataset,

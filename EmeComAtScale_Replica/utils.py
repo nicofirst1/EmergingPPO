@@ -2,6 +2,31 @@ import json
 import os
 
 from transformers import GPT2TokenizerFast, ViTImageProcessor, ViTModel
+from datasets import load_dataset
+
+from joblib import Memory
+location = './cachedir'
+memory = Memory(location, verbose=0)
+
+@memory.cache
+def load_and_preprocess_dataset(dataset_key, split, image_processor_key, num_distractors=0, limit=None):
+    # todo: load all splits
+    dataset = load_dataset(dataset_key, split=split)
+    # filter all images where the mode is not RBG
+    dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
+
+    if limit is not None:
+        dataset = dataset.filter(lambda e, i: i < limit, with_indices=True)
+
+    image_processor = ViTImageProcessor.from_pretrained(image_processor_key)
+
+    # preprocess the images
+    dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
+                          fn_kwargs={"num_distractors": num_distractors, "image_processor": image_processor},
+                          num_proc=1)
+    return dataset
+
+
 
 def initialize_pretrained_models(img_checkpoint="google/vit-base-patch16-224-in21k"):
     """
@@ -15,14 +40,17 @@ def initialize_pretrained_models(img_checkpoint="google/vit-base-patch16-224-in2
         ViTImageProcessor: The initialized image processor.
         ViTModel: The initialized image encoder with frozen parameters.
     """
-    image_processor = ViTImageProcessor.from_pretrained(img_checkpoint)
+    # moved to preprocessing, 2024-02-28 lg
+    # image_processor = ViTImageProcessor.from_pretrained(img_checkpoint)
     img_encoder = ViTModel.from_pretrained(img_checkpoint)
 
     # freeze the encoder
     for param in img_encoder.parameters():
         param.requires_grad = False
 
-    return image_processor, img_encoder
+    # moved to preprocessing, 2024-02-28 lg
+    #return image_processor, img_encoder
+    return img_encoder
 
 
 
