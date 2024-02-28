@@ -69,7 +69,7 @@ def main(args):
     # )
 
     # todo: load all splits
-    load_and_preprocess_dataset('Maysee/tiny-imagenet', 'train', opts.vision_chk, num_distractors=opts.distractors_num, limit=None)
+    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', 'train', opts.vision_chk, num_distractors=opts.distractors_num, limit=None)
 
     dataloader = DataLoader(
         dataset,
