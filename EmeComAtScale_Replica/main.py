@@ -5,12 +5,12 @@ from transformers import BertTokenizerFast, MaxLengthCriteria
 import wandb
 
 try:
-    from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
+    from EmeComAtScale_Replica.data import custom_collate_fn
     from EmeComAtScale_Replica.losses import NTXentLoss
     from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
     from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
 except ModuleNotFoundError:
-    from data import emecom_map, custom_collate_fn
+    from data import custom_collate_fn, load_and_preprocess_dataset
     from losses import NTXentLoss
     from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts, load_and_preprocess_dataset
     from utils_logs import CustomWandbLogger
