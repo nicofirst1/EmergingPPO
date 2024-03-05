@@ -1,5 +1,5 @@
 import torch
-from egg.core import Trainer, ProgressBarLogger
+from egg.core import Trainer, ProgressBarLogger, LoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 import wandb
@@ -16,6 +16,7 @@ except ModuleNotFoundError:
     from utils_logs import CustomWandbLogger
 
 from models import Sender, Receiver, EmComSSLSymbolGame
+
 
 
 def main(args):
