@@ -248,15 +248,15 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
         logging_strategy = (
             self.train_logging_strategy if self.training else self.test_logging_strategy
         )
-        interaction = logging_strategy.filtered_interaction(
-            sender_input=sender_input,
-            receiver_input=receiver_input,
-            labels=labels,
-            aux_input=None,
-            receiver_output=scores.detach(),
-            message=message.detach(),
-            message_length=torch.ones(message.size(0)),
-            aux=aux_info,
-        )
+        # interaction = logging_strategy.filtered_interaction(
+        #     sender_input=sender_input,
+        #     receiver_input=receiver_input,
+        #     labels=labels,
+        #     aux_input=None,
+        #     receiver_output=scores.detach(),
+        #     message=message.detach(),
+        #     message_length=torch.ones(message.size(0)),
+        #     aux=aux_info,
+        # )
 
         return loss.mean(), interaction

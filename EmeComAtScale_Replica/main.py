@@ -92,7 +92,7 @@ def main(args):
                                      )
 
     # wandb.watch(game)
-    wandb.watch((sender, receiver), log_freq=1000, log_graph=True)
+    wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
 
     trainer = Trainer(
         game=game,
