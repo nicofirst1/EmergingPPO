@@ -50,11 +50,16 @@ def main(args):
         distractors=opts.distractors_num,
     )
 
+    train_logging_strategy = LoggingStrategy.minimal()
+    test_logging_strategy = LoggingStrategy.minimal()
+
     game = EmComSSLSymbolGame(
         sender=sender,
         receiver=receiver,
         loss=loss,
-        distractors=opts.distractors_num
+        distractors=opts.distractors_num,
+        train_logging_strategy = train_logging_strategy,
+        test_logging_strategy = test_logging_strategy
     )
 
     model_parameters = list(sender.parameters()) + list(receiver.parameters())

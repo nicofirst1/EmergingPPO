@@ -4,7 +4,7 @@
 #$ -q cuda.q
 #$ -S /bin/bash
 #$ -M lukas.galke@mpi.nl
-##$ -m beas
+#$ -m beas
 
 set -e
 #conda deactivate  # make sure we're not in base environ
