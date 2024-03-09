@@ -63,7 +63,10 @@ def get_data_opts(parser):
     group = parser.add_argument_group("data")
 
     group.add_argument(
-        "--data_subset", type=float, default=1.0, help="A percentage of the dataset to load (default: 1.0)"
+        "--data_subset",
+        type=float,
+        default=1.0,
+        help="A percentage of the dataset to load (default: 1.0)",
     )
 
     group.add_argument(
@@ -74,7 +77,10 @@ def get_data_opts(parser):
         help="Dataset split to load",
     )
     group.add_argument(
-        "--distractors_num", type=int, default=3, help="Number of distractor images to use. -1 for none"
+        "--distractors_num",
+        type=int,
+        default=3,
+        help="Number of distractor images to use. -1 for none",
     )
 
     group.add_argument(
@@ -152,6 +158,13 @@ def get_common_opts(params) -> argparse.Namespace:
         action="store_true",
         default=False,
         help="Debugging mode: no wandb, no saving",
+    )
+
+    parser.add_argument(
+        "--log_interval",
+        type=int,
+        default=100,
+        help="Interval for logging",
     )
 
     get_data_opts(parser)

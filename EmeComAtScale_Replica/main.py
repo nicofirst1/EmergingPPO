@@ -1,13 +1,21 @@
 import torch
 import wandb
-from egg.core import Trainer, ProgressBarLogger, LoggingStrategy
+from egg.core import Trainer, ProgressBarLogger
+from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
 try:
-    from EmeComAtScale_Replica.data import custom_collate_fn, load_and_preprocess_dataset
+    from EmeComAtScale_Replica.data import (
+        custom_collate_fn,
+        load_and_preprocess_dataset,
+    )
     from EmeComAtScale_Replica.losses import NTXentLoss
-    from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
+    from EmeComAtScale_Replica.utils import (
+        initialize_pretrained_models,
+        generate_vocab_file,
+        get_common_opts,
+    )
     from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
 except ModuleNotFoundError:
     from data import custom_collate_fn, load_and_preprocess_dataset
@@ -35,10 +43,19 @@ def main(args):
     # stopping criteria as maxlength for decoder
     stopping_criteria = MaxLengthCriteria(max_length=opts.max_len)
 
-    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer, vocab_size=opts.vocab_size,
-                    stopping_criteria=stopping_criteria, gs_temperature=opts.gs_temperature)
-    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer, vocab_size=opts.vocab_size,
-                        linear_dim=opts.projection_output_dim)
+    sender = Sender(
+        img_encoder=img_encoder,
+        tokenizer=tokenizer,
+        vocab_size=opts.vocab_size,
+        stopping_criteria=stopping_criteria,
+        gs_temperature=opts.gs_temperature,
+    )
+    receiver = Receiver(
+        img_encoder=img_encoder,
+        tokenizer=tokenizer,
+        vocab_size=opts.vocab_size,
+        linear_dim=opts.projection_output_dim,
+    )
 
     sender.to(opts.device)
     receiver.to(opts.device)
@@ -50,16 +67,24 @@ def main(args):
         distractors=opts.distractors_num,
     )
 
-    train_logging_strategy = LoggingStrategy.minimal()
-    test_logging_strategy = LoggingStrategy.minimal()
+    logging_strategy = IntervalLoggingStrategy(
+        store_sender_input=False,
+        store_receiver_input=False,
+        store_labels=True,
+        store_aux_input=True,
+        store_message=True,
+        store_receiver_output=False,
+        store_message_length=False,
+        log_interval=opts.log_interval,
+    )
 
     game = EmComSSLSymbolGame(
         sender=sender,
         receiver=receiver,
         loss=loss,
         distractors=opts.distractors_num,
-        train_logging_strategy=train_logging_strategy,
-        test_logging_strategy=test_logging_strategy
+        train_logging_strategy=logging_strategy,
+        test_logging_strategy=logging_strategy,
     )
 
     model_parameters = list(sender.parameters()) + list(receiver.parameters())
@@ -89,8 +114,12 @@ def main(args):
         else:
             split = [f"{s}[:{int(opts.data_subset)}]" for s in split]
 
-    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', split, opts.vision_chk,
-                                          num_distractors=opts.distractors_num)
+    dataset = load_and_preprocess_dataset(
+        "Maysee/tiny-imagenet",
+        split,
+        opts.vision_chk,
+        num_distractors=opts.distractors_num,
+    )
 
     train_dataloader = DataLoader(
         dataset[0],
@@ -110,16 +139,18 @@ def main(args):
         valid_dataloader = None
 
     ## CALLBACKS
-    progress_bar = ProgressBarLogger(n_epochs=opts.n_epochs,
-                                     train_data_len=len(train_dataloader),
-                                     test_data_len=len(valid_dataloader) if valid_dataloader else 0,
-                                     )
+    progress_bar = ProgressBarLogger(
+        n_epochs=opts.n_epochs,
+        train_data_len=len(train_dataloader),
+        test_data_len=len(valid_dataloader) if valid_dataloader else 0,
+    )
 
-    wandb_logger = CustomWandbLogger(entity='emergingtransformer',
-                                     project='EmergingPPO',
-                                     opts=opts,
-                                     mode="offline" if opts.debug else "online",
-                                     )
+    wandb_logger = CustomWandbLogger(
+        entity="emergingtransformer",
+        project="EmergingPPO",
+        opts=opts,
+        mode="offline" if opts.debug else "online",
+    )
 
     # wandb.watch(game)
     wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
