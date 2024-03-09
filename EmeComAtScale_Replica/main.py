@@ -1,8 +1,8 @@
 import torch
+import wandb
 from egg.core import Trainer, ProgressBarLogger, LoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
-import wandb
 
 try:
     from EmeComAtScale_Replica.data import custom_collate_fn, load_and_preprocess_dataset
@@ -16,7 +16,6 @@ except ModuleNotFoundError:
     from utils_logs import CustomWandbLogger
 
 from models import Sender, Receiver, EmComSSLSymbolGame
-
 
 
 def main(args):
@@ -59,8 +58,8 @@ def main(args):
         receiver=receiver,
         loss=loss,
         distractors=opts.distractors_num,
-        train_logging_strategy = train_logging_strategy,
-        test_logging_strategy = test_logging_strategy
+        train_logging_strategy=train_logging_strategy,
+        test_logging_strategy=test_logging_strategy
     )
 
     model_parameters = list(sender.parameters()) + list(receiver.parameters())
@@ -74,25 +73,24 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
-    split=opts.data_split
+    split = opts.data_split
 
     # if split is all, load both train and test
-    if split=="all":
-        split=["train", "valid"]
+    if split == "all":
+        split = ["train", "valid"]
     else:
-        split=[split]
+        split = [split]
 
     # if data_subset is not 1.0, load only a subset of the data
     if opts.data_subset != 1.0:
         # if it i less than zero we need to take a percentage of the data
         if opts.data_subset < 0:
-            split = [f"{s}[:{int(opts.data_subset*100)}%]" for s in split]
+            split = [f"{s}[:{int(opts.data_subset * 100)}%]" for s in split]
         else:
             split = [f"{s}[:{int(opts.data_subset)}]" for s in split]
 
-    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', split, opts.vision_chk, num_distractors=opts.distractors_num)
-
-
+    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', split, opts.vision_chk,
+                                          num_distractors=opts.distractors_num)
 
     train_dataloader = DataLoader(
         dataset[0],
@@ -101,7 +99,7 @@ def main(args):
         collate_fn=custom_collate_fn,
     )
 
-    if len(dataset)>1:
+    if len(dataset) > 1:
         valid_dataloader = DataLoader(
             dataset[1],
             batch_size=opts.batch_size,
@@ -116,7 +114,6 @@ def main(args):
                                      train_data_len=len(train_dataloader),
                                      test_data_len=len(valid_dataloader) if valid_dataloader else 0,
                                      )
-
 
     wandb_logger = CustomWandbLogger(entity='emergingtransformer',
                                      project='EmergingPPO',

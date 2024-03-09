@@ -1,8 +1,7 @@
 import json
 import os
 
-from transformers import GPT2TokenizerFast, ViTImageProcessor, ViTModel
-
+from transformers import ViTImageProcessor, ViTModel
 
 
 def initialize_pretrained_models(img_checkpoint="google/vit-base-patch16-224-in21k"):
@@ -26,9 +25,8 @@ def initialize_pretrained_models(img_checkpoint="google/vit-base-patch16-224-in2
         param.requires_grad = False
 
     # moved to preprocessing, 2024-02-28 lg
-    #return image_processor, img_encoder
+    # return image_processor, img_encoder
     return img_encoder
-
 
 
 def generate_vocab_file(vocab_size, filename="vocab.txt"):
@@ -40,7 +38,7 @@ def generate_vocab_file(vocab_size, filename="vocab.txt"):
         filename (str): The name of the file to save the vocabulary.
     """
 
-    vocab_dict={k:k for k in range(vocab_size)}
+    vocab_dict = {k: k for k in range(vocab_size)}
     with open(filename, "w") as f:
         json.dump(vocab_dict, f)
 
@@ -49,6 +47,7 @@ def generate_vocab_file(vocab_size, filename="vocab.txt"):
     filename = os.path.abspath(filename)
 
     return filename
+
 
 # Copyright (c) Facebook, Inc. and its affiliates.
 
@@ -62,7 +61,6 @@ import egg.core as core
 
 def get_data_opts(parser):
     group = parser.add_argument_group("data")
-
 
     group.add_argument(
         "--data_subset", type=float, default=1.0, help="A percentage of the dataset to load (default: 1.0)"
@@ -79,11 +77,9 @@ def get_data_opts(parser):
         "--distractors_num", type=int, default=3, help="Number of distractor images to use. -1 for none"
     )
 
-
     group.add_argument(
         "--num_workers", type=int, default=4, help="Workers used in the dataloader"
     )
-
 
 
 def get_gs_opts(parser):
@@ -108,8 +104,6 @@ def get_vision_module_opts(parser):
     )
 
 
-
-
 def get_game_arch_opts(parser):
     group = parser.add_argument_group("game architecture")
     group.add_argument(
@@ -124,6 +118,7 @@ def get_game_arch_opts(parser):
         default=2048,
         help="Projection head's output dimension for image features",
     )
+
 
 def get_loss_opts(parser):
     group = parser.add_argument_group("loss")
@@ -143,7 +138,7 @@ def get_loss_opts(parser):
     )
 
 
-def get_common_opts(params)-> argparse.Namespace:
+def get_common_opts(params) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--weight_decay",
@@ -151,8 +146,6 @@ def get_common_opts(params)-> argparse.Namespace:
         default=10e-6,
         help="Weight decay used for SGD",
     )
-
-
 
     parser.add_argument(
         "--debug",

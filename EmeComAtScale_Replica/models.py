@@ -230,7 +230,6 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
         self.distractors = distractors
 
     def forward(self, sender_input, labels, receiver_input, aux_input=None):
-
         if self.distractors < 1:
             # if no distractors present input is the same for both
             sender_input = receiver_input
