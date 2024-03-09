@@ -36,3 +36,16 @@ class CustomWandbLogger(WandbLogger):
 
         if self.trainer.distributed_context.is_leader:
             self.log_to_wandb(log_dict, commit=True)
+
+    def on_validation_end(self, loss: float, logs: Interaction, epoch: int):
+        acc = logs.aux['acc'].mean()
+        # loss = loss.detach()
+
+        log_dict = dict(
+            val_loss=loss,
+            val_acc=acc,
+            epoch=epoch,
+        )
+
+        if self.trainer.distributed_context.is_leader:
+            self.log_to_wandb(log_dict, commit=True)

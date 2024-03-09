@@ -5,7 +5,7 @@ from transformers import BertTokenizerFast, MaxLengthCriteria
 import wandb
 
 try:
-    from EmeComAtScale_Replica.data import custom_collate_fn
+    from EmeComAtScale_Replica.data import custom_collate_fn, load_and_preprocess_dataset
     from EmeComAtScale_Replica.losses import NTXentLoss
     from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
     from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
@@ -74,27 +74,54 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
-    # todo: load all splits
-    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', 'train', opts.vision_chk, num_distractors=opts.distractors_num, limit=None)
+    split=opts.data_split
 
-    dataloader = DataLoader(
-        dataset,
+    # if split is all, load both train and test
+    if split=="all":
+        split=["train", "valid"]
+    else:
+        split=[split]
+
+    # if data_subset is not 1.0, load only a subset of the data
+    if opts.data_subset != 1.0:
+        # if it i less than zero we need to take a percentage of the data
+        if opts.data_subset < 0:
+            split = [f"{s}[:{int(opts.data_subset*100)}%]" for s in split]
+        else:
+            split = [f"{s}[:{int(opts.data_subset)}]" for s in split]
+
+    dataset = load_and_preprocess_dataset('Maysee/tiny-imagenet', split, opts.vision_chk, num_distractors=opts.distractors_num)
+
+
+
+    train_dataloader = DataLoader(
+        dataset[0],
         batch_size=opts.batch_size,
         shuffle=True,
         collate_fn=custom_collate_fn,
-
     )
+
+    if len(dataset)>1:
+        valid_dataloader = DataLoader(
+            dataset[1],
+            batch_size=opts.batch_size,
+            shuffle=True,
+            collate_fn=custom_collate_fn,
+        )
+    else:
+        valid_dataloader = None
 
     ## CALLBACKS
     progress_bar = ProgressBarLogger(n_epochs=opts.n_epochs,
-                                     train_data_len=len(dataloader))
+                                     train_data_len=len(train_dataloader),
+                                     test_data_len=len(valid_dataloader) if valid_dataloader else 0,
+                                     )
 
 
     wandb_logger = CustomWandbLogger(entity='emergingtransformer',
                                      project='EmergingPPO',
                                      opts=opts,
-                                     # todo: comment out
-                                    # mode="offline"
+                                     mode="offline" if opts.debug else "online",
                                      )
 
     # wandb.watch(game)
@@ -104,7 +131,8 @@ def main(args):
         game=game,
         optimizer=optimizer,
         # optimizer_scheduler=optimizer_scheduler,
-        train_data=dataloader,
+        train_data=train_dataloader,
+        validation_data=valid_dataloader,
         callbacks=[progress_bar, wandb_logger],
     )
     trainer.train(n_epochs=opts.n_epochs)

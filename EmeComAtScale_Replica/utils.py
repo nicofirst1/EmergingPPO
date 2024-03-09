@@ -62,23 +62,19 @@ import egg.core as core
 
 def get_data_opts(parser):
     group = parser.add_argument_group("data")
+
+
     group.add_argument(
-        "--dataset_dir",
+        "--data_subset", type=float, default=1.0, help="A percentage of the dataset to load (default: 1.0)"
+    )
+
+    group.add_argument(
+        "--data_split",
         type=str,
-        default="./data",
-        help="Dataset location",
+        default="all",
+        choices=["valid", "train"],
+        help="Dataset split to load",
     )
-
-    group.add_argument(
-        "--dataset_name",
-        choices=["cifar10", "imagenet"],
-        default="imagenet",
-        help="Dataset used for training a model",
-    )
-
-
-
-
     group.add_argument(
         "--distractors_num", type=int, default=3, help="Number of distractor images to use. -1 for none"
     )
@@ -87,12 +83,7 @@ def get_data_opts(parser):
     group.add_argument(
         "--num_workers", type=int, default=4, help="Workers used in the dataloader"
     )
-    parser.add_argument(
-        "--return_original_image",
-        action="store_true",
-        default=False,
-        help="Dataloader will yield also the non-augmented version of the input images",
-    )
+
 
 
 def get_gs_opts(parser):
@@ -103,47 +94,11 @@ def get_gs_opts(parser):
         default=1.0,
         help="gs temperature used in the relaxation layer",
     )
-    group.add_argument(
-        "--gs_temperature_decay",
-        type=float,
-        default=1.0,
-        help="gs temperature update_factor (default: 1.0)",
-    )
-    group.add_argument(
-        "--train_gs_temperature",
-        default=False,
-        action="store_true",
-        help="train gs temperature used in the relaxation layer",
-    )
-    group.add_argument(
-        "--straight_through",
-        default=False,
-        action="store_true",
-        help="use straight through gumbel softmax estimator",
-    )
-    group.add_argument(
-        "--update_gs_temp_frequency",
-        default=1,
-        type=int,
-        help="update gs temperature frequency (default: 1)",
-    )
-    group.add_argument(
-        "--minimum_gs_temperature",
-        default=1.0,
-        type=float,
-        help="minimum gs temperature when frequency update (default: 1.0)",
-    )
 
 
 def get_vision_module_opts(parser):
     group = parser.add_argument_group("vision module")
-    group.add_argument(
-        "--model_name",
-        type=str,
-        default="resnet50",
-        choices=["resnet50", "resnet101", "resnet152"],
-        help="Model name for the encoder",
-    )
+
     group.add_argument(
         "--vision_chk",
         type=str,
@@ -151,19 +106,8 @@ def get_vision_module_opts(parser):
         choices=["google/vit-base-patch16-224-in21k"],
         help="Checkpoint for pretrained Vit",
     )
-    group.add_argument(
-        "--shared_vision",
-        default=False,
-        action="store_true",
-        help="If set, Sender and Receiver will share the vision encoder",
-    )
-    group.add_argument(
-        "--pretrain_vision",
-        default=False,
-        action="store_true",
-        help="If set, pretrained vision modules will be used",
-    )
-    group.add_argument("--use_augmentations", action="store_true", default=False)
+
+
 
 
 def get_game_arch_opts(parser):
@@ -180,29 +124,10 @@ def get_game_arch_opts(parser):
         default=2048,
         help="Projection head's output dimension for image features",
     )
-    group.add_argument(
-        "--simclr_sender",
-        default=False,
-        action="store_true",
-        help="Use a simclr-like sender (no discreteness)",
-    )
-    group.add_argument(
-        "--discrete_evaluation_simclr",
-        default=False,
-        action="store_true",
-        help="Use a simclr-like sender argmaxing the message_like layer at test time",
-    )
-
 
 def get_loss_opts(parser):
     group = parser.add_argument_group("loss")
-    group.add_argument(
-        "--loss_type",
-        type=str,
-        default="xent",
-        choices=["xent", "ntxent"],
-        help="Model name for loss function",
-    )
+
     group.add_argument(
         "--loss_temperature",
         type=float,
@@ -216,12 +141,6 @@ def get_loss_opts(parser):
         choices=["cosine", "dot"],
         help="Similarity function used in loss",
     )
-    group.add_argument(
-        "--use_distributed_negatives",
-        default=False,
-        action="store_true",
-        help="Share negatives across GPUs (requires a distributed training setup)",
-    )
 
 
 def get_common_opts(params)-> argparse.Namespace:
@@ -232,14 +151,14 @@ def get_common_opts(params)-> argparse.Namespace:
         default=10e-6,
         help="Weight decay used for SGD",
     )
+
+
+
     parser.add_argument(
-        "--use_larc", action="store_true", default=False, help="Use LARC optimizer"
-    )
-    parser.add_argument(
-        "--pdb",
+        "--debug",
         action="store_true",
         default=False,
-        help="Run the game with pdb enabled",
+        help="Debugging mode: no wandb, no saving",
     )
 
     get_data_opts(parser)

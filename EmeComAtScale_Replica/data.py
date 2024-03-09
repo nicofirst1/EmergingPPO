@@ -10,21 +10,23 @@ location = './cachedir'
 memory = Memory(location, verbose=0)
 
 @memory.cache
-def load_and_preprocess_dataset(dataset_key, split, image_processor_key, num_distractors=0, limit=None):
+def load_and_preprocess_dataset(dataset_key, split, image_processor_key, num_distractors=0):
     # todo: load all splits
     dataset = load_dataset(dataset_key, split=split)
-    # filter all images where the mode is not RBG
-    dataset = dataset.filter(lambda e: e["image"].mode == "RGB")
 
-    if limit is not None:
-        dataset = dataset.filter(lambda e, i: i < limit, with_indices=True)
+    # when loading two splits the dataset is a list, if not then only one split is loaded
+    if not isinstance(dataset, list):
+        dataset = list(dataset)
+
+    # filter all images where the mode is not RBG
+    dataset = [d.filter(lambda e: e["image"].mode == "RGB") for d in dataset]
 
     image_processor = ViTImageProcessor.from_pretrained(image_processor_key)
 
     # preprocess the images
-    dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
+    dataset = [d.map(emecom_map, batched=True, remove_columns=["image"],
                           fn_kwargs={"num_distractors": num_distractors, "image_processor": image_processor},
-                          num_proc=1)
+                          num_proc=1) for d in dataset]
     return dataset
 
 def emecom_map(example, num_distractors:int, image_processor:ViTImageProcessor):

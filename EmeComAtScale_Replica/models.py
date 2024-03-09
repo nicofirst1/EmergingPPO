@@ -242,9 +242,6 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
             img_enc_out, txt_enc_out, message, scores, labels
         )
 
-        if not self.training:
-            aux_info["message"] = message
-
         logging_strategy = (
             self.train_logging_strategy if self.training else self.test_logging_strategy
         )
