@@ -1,9 +1,33 @@
+import torch
+import json
+import wandb
+
 from egg.core import Interaction
 from egg.core.callbacks import WandbLogger
 
+from egg.core.language_analysis import TopographicSimilarity
+
+
+class CustomTopSimWithWandbLogging(TopographicSimilarity):
+    def print_message(self, logs: Interaction, mode: str, epoch: int) -> None:
+        messages = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
+        messages = [msg.tolist() for msg in messages]
+        sender_input = torch.flatten(logs.sender_input, start_dim=1)
+
+        topsim = self.compute_topsim(sender_input, messages, self.sender_input_distance_fn, self.message_distance_fn)
+
+        output = json.dumps(dict(topsim=topsim, mode=mode, epoch=epoch))
+        print(output, flush=True)
+
+        wandb_dict = {
+            f"{mode}/topsim": topsim,
+            "Epoch": epoch
+        }
+        wandb.log(wandb_dict)
+
+
 
 class CustomWandbLogger(WandbLogger):
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 

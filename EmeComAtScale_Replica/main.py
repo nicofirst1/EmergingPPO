@@ -1,6 +1,6 @@
 import torch
 import wandb
-from egg.core import Trainer, ProgressBarLogger, LoggingStrategy
+from egg.core import Trainer, ProgressBarLogger, LoggingStrategy, TopographicSimilarity
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
@@ -8,12 +8,12 @@ try:
     from EmeComAtScale_Replica.data import custom_collate_fn, load_and_preprocess_dataset
     from EmeComAtScale_Replica.losses import NTXentLoss
     from EmeComAtScale_Replica.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
+    from EmeComAtScale_Replica.utils_logs import CustomWandbLogger, CustomTopSimWithWandbLogging
 except ModuleNotFoundError:
     from data import custom_collate_fn, load_and_preprocess_dataset
     from losses import NTXentLoss
     from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from utils_logs import CustomWandbLogger
+    from utils_logs import CustomWandbLogger, CustomTopSimWithWandbLogging
 
 from models import Sender, Receiver, EmComSSLSymbolGame
 
@@ -115,11 +115,18 @@ def main(args):
                                      test_data_len=len(valid_dataloader) if valid_dataloader else 0,
                                      )
 
+    topsim = CustomTopSimWithWandbLogging(sender_input_distance_fn="euclidean",
+                                          message_distance_fn="edit",
+                                          compute_topsim_train_set=True,
+                                          compute_topsim_test_set=True,
+                                          is_gumbel=True)
+
     wandb_logger = CustomWandbLogger(entity='emergingtransformer',
                                      project='EmergingPPO',
                                      opts=opts,
                                      mode="offline" if opts.debug else "online",
                                      )
+
 
     # wandb.watch(game)
     wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
@@ -130,7 +137,7 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[progress_bar, wandb_logger],
+        callbacks=[progress_bar, topsim, wandb_logger],
     )
     trainer.train(n_epochs=opts.n_epochs)
 
