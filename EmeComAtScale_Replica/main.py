@@ -98,28 +98,7 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
-    split = opts.data_split
-
-    # if split is all, load both train and test
-    if split == "all":
-        split = ["train", "valid"]
-    else:
-        split = [split]
-
-    # if data_subset is not 1.0, load only a subset of the data
-    if opts.data_subset != 1.0:
-        # if it i less than zero we need to take a percentage of the data
-        if opts.data_subset < 0:
-            split = [f"{s}[:{int(opts.data_subset * 100)}%]" for s in split]
-        else:
-            split = [f"{s}[:{int(opts.data_subset)}]" for s in split]
-
-    dataset = load_and_preprocess_dataset(
-        "Maysee/tiny-imagenet",
-        split,
-        opts.vision_chk,
-        num_distractors=opts.distractors_num,
-    )
+    dataset = load_and_preprocess_dataset("Maysee/tiny-imagenet", opts)
 
     train_dataloader = DataLoader(
         dataset[0],
@@ -161,7 +140,10 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[progress_bar, wandb_logger],
+        callbacks=[
+            wandb_logger,
+            progress_bar,
+        ],
     )
     trainer.train(n_epochs=opts.n_epochs)
 

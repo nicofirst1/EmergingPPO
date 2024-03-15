@@ -7,6 +7,8 @@ class CustomWandbLogger(WandbLogger):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self.img_msg_corr = {}
+
     def on_batch_end(
         self, logs: Interaction, loss: float, batch_id: int, is_training: bool = True
     ):
@@ -36,7 +38,16 @@ class CustomWandbLogger(WandbLogger):
             return
 
         acc = logs.aux["acc"].mean()
-        # loss = loss.detach()
+        img_ids = logs.aux.pop("img_id")
+
+        for idx in range(len(img_ids)):
+            img_id = img_ids[idx].item()
+            msg = logs.message[idx]
+            try:
+                # try/except faster in further epochs
+                self.img_msg_corr[img_id].append(msg)
+            except KeyError:
+                self.img_msg_corr[img_id] = [msg]
 
         log_dict = {
             f"{split}_loss": loss,
