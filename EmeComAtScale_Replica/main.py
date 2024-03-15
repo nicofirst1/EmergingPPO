@@ -51,7 +51,12 @@ def main(args):
     )
 
     train_logging_strategy = LoggingStrategy.minimal()
+    train_logging_strategy.store_sender_input = True
+    train_logging_strategy.store_message = True
+
     test_logging_strategy = LoggingStrategy.minimal()
+    test_logging_strategy.store_sender_input = True
+    test_logging_strategy.store_message = True
 
     game = EmComSSLSymbolGame(
         sender=sender,
