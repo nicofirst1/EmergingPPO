@@ -1,5 +1,3 @@
-import json
-
 import torch
 import wandb
 from egg.core import Interaction
@@ -22,9 +20,6 @@ class CustomTopSimWithWandbLogging(TopographicSimilarity):
         )
 
         logs.aux["topsim"] = torch.as_tensor(topsim)
-
-        output = json.dumps(dict(topsim=topsim, mode=mode, epoch=epoch))
-        print(output, flush=True)
 
         wandb_dict = {f"{mode}/topsim": topsim, "Epoch": epoch}
         wandb.log(wandb_dict)

@@ -1,6 +1,6 @@
 import torch
 import wandb
-from egg.core import Trainer, ProgressBarLogger
+from egg.core import Trainer, ConsoleLogger
 from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
@@ -121,11 +121,7 @@ def main(args):
         valid_dataloader = None
 
     ## CALLBACKS
-    progress_bar = ProgressBarLogger(
-        n_epochs=opts.n_epochs,
-        train_data_len=len(train_dataloader),
-        test_data_len=len(valid_dataloader) if valid_dataloader else 0,
-    )
+    progress_bar = ConsoleLogger(print_train_loss=True, as_json=True)
 
     topsim = CustomTopSimWithWandbLogging(
         sender_input_distance_fn="euclidean",
