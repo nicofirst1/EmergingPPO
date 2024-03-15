@@ -16,12 +16,15 @@ try:
         generate_vocab_file,
         get_common_opts,
     )
-    from EmeComAtScale_Replica.utils_logs import CustomWandbLogger
+    from EmeComAtScale_Replica.utils_logs import (
+        CustomWandbLogger,
+        CustomTopSimWithWandbLogging,
+    )
 except ModuleNotFoundError:
     from data import custom_collate_fn, load_and_preprocess_dataset
     from losses import NTXentLoss
     from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from utils_logs import CustomWandbLogger
+    from utils_logs import CustomWandbLogger, CustomTopSimWithWandbLogging
 
 from models import Sender, Receiver, EmComSSLSymbolGame
 
@@ -68,7 +71,7 @@ def main(args):
     )
 
     logging_strategy = IntervalLoggingStrategy(
-        store_sender_input=False,
+        store_sender_input=True,
         store_receiver_input=False,
         store_labels=True,
         store_aux_input=True,
@@ -124,6 +127,14 @@ def main(args):
         test_data_len=len(valid_dataloader) if valid_dataloader else 0,
     )
 
+    topsim = CustomTopSimWithWandbLogging(
+        sender_input_distance_fn="euclidean",
+        message_distance_fn="edit",
+        compute_topsim_train_set=True,
+        compute_topsim_test_set=True,
+        is_gumbel=True,
+    )
+
     wandb_logger = CustomWandbLogger(
         entity="emergingtransformer",
         project="EmergingPPO",
@@ -140,10 +151,7 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[
-            wandb_logger,
-            progress_bar,
-        ],
+        callbacks=[topsim, wandb_logger, progress_bar],
     )
     trainer.train(n_epochs=opts.n_epochs)
 

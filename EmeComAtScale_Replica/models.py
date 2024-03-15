@@ -271,11 +271,17 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
             sender_input = receiver_input
 
         message, scores = self.sender(sender_input)
+
         txt_enc_out, img_enc_out = self.receiver(scores, receiver_input)
 
         loss, aux_info = self.loss(img_enc_out, txt_enc_out, message, scores, labels)
 
         aux_info["img_id"] = aux_input
+
+        aux_input = dict(
+            scores=scores.detach().squeeze(1),
+            txt_enc_out=txt_enc_out.detach(),
+        )
 
         logging_strategy = (
             self.train_logging_strategy if self.training else self.test_logging_strategy
@@ -284,8 +290,8 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
             sender_input=sender_input,
             receiver_input=receiver_input,
             labels=labels,
-            aux_input=None,
-            receiver_output=scores.detach(),
+            aux_input=aux_input,
+            receiver_output=img_enc_out.detach(),
             message=message.detach(),
             message_length=torch.ones(message.size(0)),
             aux=aux_info,
