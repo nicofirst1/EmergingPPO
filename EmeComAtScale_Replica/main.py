@@ -121,7 +121,7 @@ def main(args):
         valid_dataloader = None
 
     ## CALLBACKS
-    progress_bar = ConsoleLogger(print_train_loss=True, as_json=True)
+    console_logger = ConsoleLogger(print_train_loss=True, as_json=True)
 
     topsim = CustomTopSimWithWandbLogging(
         sender_input_distance_fn="euclidean",
@@ -147,7 +147,7 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[topsim, wandb_logger, progress_bar],
+        callbacks=[topsim, wandb_logger, console_logger],
     )
     trainer.train(n_epochs=opts.n_epochs)
 

@@ -7,6 +7,10 @@ from egg.core.language_analysis import TopographicSimilarity
 
 class CustomTopSimWithWandbLogging(TopographicSimilarity):
     def print_message(self, logs: Interaction, mode: str, epoch: int) -> None:
+
+        if logs == Interaction.empty():
+            return
+
         messages = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
         messages = [msg.tolist() for msg in messages]
         sender_input = torch.flatten(logs.sender_input, start_dim=1)
