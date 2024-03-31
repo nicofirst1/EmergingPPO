@@ -17,7 +17,8 @@ class CustomTopSimWithWandbLogging(TopographicSimilarity):
 
         # topsim = self.compute_topsim(sender_input, messages, self.sender_input_distance_fn, self.message_distance_fn)
         print("sender_input.size()", sender_input.size())
-        print("messages.size()", messages.size())
+        print("len(messages)", len(messages))
+        print("len(messages[0])", len(messages[0]))
         #print("scores.size()", logs.aux_input["scores"].size())
         topsim = self.compute_topsim(
             sender_input,
