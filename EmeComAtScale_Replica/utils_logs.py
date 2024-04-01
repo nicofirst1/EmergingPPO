@@ -11,14 +11,21 @@ class CustomTopSimWithWandbLogging(TopographicSimilarity):
         if logs == Interaction.empty():
             return
 
+        # are these already argmax'ed?
+        print("logs.messages.size()", logs.messages.size())
+        # version below seems to reduce to single-int messages
+
         messages = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
         messages = [msg.tolist() for msg in messages]
+
         sender_input = torch.flatten(logs.sender_input, start_dim=1)
 
         # topsim = self.compute_topsim(sender_input, messages, self.sender_input_distance_fn, self.message_distance_fn)
         print("sender_input.size()", sender_input.size())
+
         print("len(messages)", len(messages))
-        print("len(messages[0])", len(messages[0]))
+        print("messages[0]", messages[0])
+        #print("len(messages[0])", len(messages[0]))
         #print("scores.size()", logs.aux_input["scores"].size())
         topsim = self.compute_topsim(
             sender_input,
