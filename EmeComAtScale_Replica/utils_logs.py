@@ -16,7 +16,9 @@ class CustomTopSimWithWandbLogging(TopographicSimilarity):
         # version below seems to reduce to single-int messages
 
         messages = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
-        messages = [msg.tolist() for msg in messages]
+    
+        # topsim throws error with lists
+        #messages = [msg.tolist() for msg in messages]
 
         sender_input = torch.flatten(logs.sender_input, start_dim=1)
 
