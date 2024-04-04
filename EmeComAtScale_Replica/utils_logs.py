@@ -12,7 +12,7 @@ class CustomTopSimWithWandbLogging(TopographicSimilarity):
             return
 
         # are these already argmax'ed?
-        print("logs.messages.size()", logs.messages.size())
+        print("logs.message.size()", logs.message.size())
         # version below seems to reduce to single-int messages
 
         messages = logs.message.argmax(dim=-1) if self.is_gumbel else logs.message
