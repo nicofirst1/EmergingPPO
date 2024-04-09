@@ -9,7 +9,7 @@ from joblib import Memory
 from transformers import ViTImageProcessor
 
 location = "./cachedir"
-memory = Memory(location, verbose=0)
+memory = Memory(location, verbose=1)
 
 from typing import Optional, Union
 
