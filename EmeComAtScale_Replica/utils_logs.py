@@ -1,11 +1,68 @@
 import torch
 import wandb
+import numpy as np
 from egg.core import Interaction
 from egg.core.callbacks import WandbLogger
 from egg.core.language_analysis import TopographicSimilarity
 
+from scipy.stats import pearsonr, spearmanr
+from scipy.spatial import distance
+from typing import Union, Callable
 
-class CustomTopSimWithWandbLogging(TopographicSimilarity):
+from measures import pairwise_dedup, normalized_editdistance, Message, Messages
+
+
+class CustomTopographicSimilarity(TopographicSimilarity):
+    @staticmethod
+    def compute_topsim(
+        meanings: torch.Tensor,
+        messages: Messages,
+        meaning_distance_fn: Union[str, Callable] = "hamming",
+        message_distance_fn: Union[str, Callable] = "edit",
+    ) -> float:
+
+        distances = {
+            # original
+            #"edit": lambda x, y: editdistance.eval(x, y) / ((len(x) + len(y)) / 2),
+            "edit": normalized_editdistance, # my version
+            "cosine": distance.cosine,
+            "hamming": distance.hamming,
+            "jaccard": distance.jaccard,
+            "euclidean": distance.euclidean,
+        }
+
+        meaning_distance_fn = (
+            distances.get(meaning_distance_fn, None)
+            if isinstance(meaning_distance_fn, str)
+            else meaning_distance_fn
+        )
+        message_distance_fn = (
+            distances.get(message_distance_fn, None)
+            if isinstance(message_distance_fn, str)
+            else message_distance_fn
+        )
+
+        assert (
+            meaning_distance_fn and message_distance_fn
+        ), f"Cannot recognize {meaning_distance_fn} \
+            or {message_distance_fn} distances"
+
+        # Orig code
+        # meaning_dist = distance.pdist(meanings, meaning_distance_fn)
+        # message_dist = distance.pdist(messages, message_distance_fn)
+
+        assert len(messages) == len(meanings)
+        meaning_dist = np.array(list(pairwise_dedup(meaning_distance_fn, meanings)))
+        message_dist = np.array(list(pairwise_dedup(message_distance_fn, messages)))
+
+        # Raviv 2019 uses pearson
+        # topsim, __pval = pearsonr(meaning_dist, message_dist)
+
+        # Egg uses Spearman, let's go with it
+        topsim = spearmanr(meaning_dist, message_dist, nan_policy="raise").correlation
+
+        return topsim
+
     def print_message(self, logs: Interaction, mode: str, epoch: int) -> None:
 
         if logs == Interaction.empty():

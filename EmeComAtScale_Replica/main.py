@@ -18,13 +18,13 @@ try:
     )
     from EmeComAtScale_Replica.utils_logs import (
         CustomWandbLogger,
-        CustomTopSimWithWandbLogging,
+        CustomTopographicSimilarity,
     )
 except ModuleNotFoundError:
     from data import custom_collate_fn, load_and_preprocess_dataset
     from losses import NTXentLoss
     from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from utils_logs import CustomWandbLogger, CustomTopSimWithWandbLogging
+    from utils_logs import CustomWandbLogger, CustomTopographicSimilarity
 
 from models import Sender, Receiver, EmComSSLSymbolGame
 
@@ -101,7 +101,12 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
-    dataset = load_and_preprocess_dataset("Maysee/tiny-imagenet", opts)
+    dataset = load_and_preprocess_dataset("Maysee/tiny-imagenet",
+                                          opts.split,
+                                          opts.vision_chk,
+                                          distractors_num=opts.distractors_num,
+                                          data_subset=opts.data_subset
+                                          )
 
     train_dataloader = DataLoader(
         dataset[0],
@@ -123,7 +128,7 @@ def main(args):
     ## CALLBACKS
     console_logger = ConsoleLogger(print_train_loss=True, as_json=True)
 
-    topsim = CustomTopSimWithWandbLogging(
+    topsim = CustomTopographicSimilarity(
         sender_input_distance_fn="euclidean",
         message_distance_fn="edit",
         compute_topsim_train_set=True,

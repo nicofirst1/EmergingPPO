@@ -11,11 +11,15 @@ from transformers import ViTImageProcessor
 location = "./cachedir"
 memory = Memory(location, verbose=0)
 
+from typing import Optional, Union
+
 
 @memory.cache
-def load_and_preprocess_dataset(dataset_key, opts: Namespace):
-
-    split = opts.data_split
+def load_and_preprocess_dataset(dataset_key:str,
+                                split:str,
+                                vision_chk:str,
+                                distractors_num:Optional[int]=0,  # Legacy, we use batch size instead
+                                data_subset:Optional[Union[float,int]]=None):
 
     # if split is all, load both train and test
     if split == "all":
@@ -24,12 +28,12 @@ def load_and_preprocess_dataset(dataset_key, opts: Namespace):
         split = [split]
 
     # if data_subset is not 1.0, load only a subset of the data
-    if opts.data_subset != 1.0:
+    if data_subset is not None:
         # if it i less than zero we need to take a percentage of the data
-        if opts.data_subset < 0:
-            split = [f"{s}[:{int(opts.data_subset * 100)}%]" for s in split]
+        if data_subset < 0:
+            split = [f"{s}[:{int(data_subset * 100)}%]" for s in split]
         else:
-            split = [f"{s}[:{int(opts.data_subset)}]" for s in split]
+            split = [f"{s}[:{int(data_subset)}]" for s in split]
 
     # todo: load all splits
     dataset = load_dataset(dataset_key, split=split)
@@ -41,7 +45,7 @@ def load_and_preprocess_dataset(dataset_key, opts: Namespace):
     # filter all images where the mode is not RBG
     dataset = [d.filter(lambda e: e["image"].mode == "RGB") for d in dataset]
 
-    image_processor = ViTImageProcessor.from_pretrained(opts.vision_chk)
+    image_processor = ViTImageProcessor.from_pretrained(vision_chk)
 
     # preprocess the images
     dataset = [
@@ -51,7 +55,7 @@ def load_and_preprocess_dataset(dataset_key, opts: Namespace):
             with_indices=True,
             remove_columns=["image"],
             fn_kwargs={
-                "num_distractors": opts.distractors_num,
+                "num_distractors": distractors_num,
                 "image_processor": image_processor,
             },
             num_proc=1,
