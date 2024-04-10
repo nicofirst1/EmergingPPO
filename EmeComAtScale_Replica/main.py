@@ -102,7 +102,7 @@ def main(args):
     # )
 
     dataset = load_and_preprocess_dataset("Maysee/tiny-imagenet",
-                                          opts.split,
+                                          opts.data_split,
                                           opts.vision_chk,
                                           distractors_num=opts.distractors_num,
                                           data_subset=opts.data_subset
@@ -144,7 +144,9 @@ def main(args):
     )
 
     # wandb.watch(game)
-    wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
+    #wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
+    # 2024-04-10, lg: Run finished with no logs uploaded to wb -> we have our custom log freq now, do we need wb's?
+    wandb.watch((sender, receiver), log_graph=False)
 
     trainer = Trainer(
         game=game,
