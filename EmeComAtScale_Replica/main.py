@@ -162,7 +162,7 @@ def main(args):
         message_distance_fn="edit",
         compute_topsim_train_set=True,
         compute_topsim_test_set=True,
-        is_gumbel=True,
+        is_gumbel=False,  # message should be already argmax'ed, 2024-04-16 lg
     )
 
     wandb_logger = CustomWandbLogger(
