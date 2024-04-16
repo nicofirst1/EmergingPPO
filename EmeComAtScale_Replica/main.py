@@ -137,20 +137,26 @@ def main(args):
 
     ## DUMMY SWEEPS
     print("Dummy sweep sender input")
+
+        
     for i, batch in enumerate(train_dataloader):
         # Same as in egg's trainer
         if not isinstance(batch, Batch):
             batch = Batch(*batch)
-        print(batch)
-        print("Sender input size", batch['sender_input'].size())
+        print("Sender input size", batch.sender_input.size())
+        print("Labels size", batch.labels.size())
+        print("Receiver input size", batch.receiver_input.size())
+        print("Aux input size", batch.aux_input.size())
         if i > 5:
             break
     for i, batch in enumerate(valid_dataloader):
         # Same as in egg's trainer
         if not isinstance(batch, Batch):
             batch = Batch(*batch)
-        print(batch)
-        print("Sender input size", batch['sender_input'].size())
+        print("Sender input size", batch.sender_input.size())
+        print("Labels size", batch.labels.size())
+        print("Receiver input size", batch.receiver_input.size())
+        print("Aux input size", batch.aux_input.size())
         if i > 5:
             break
 
