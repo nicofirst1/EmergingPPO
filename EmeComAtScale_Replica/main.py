@@ -2,6 +2,7 @@ import torch
 import wandb
 from egg.core import Trainer, ConsoleLogger
 from egg.core.interaction import IntervalLoggingStrategy
+from egg.core.batch import Batch
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
@@ -132,6 +133,26 @@ def main(args):
         )
     else:
         valid_dataloader = None
+
+
+    ## DUMMY SWEEPS
+    print("Dummy sweep sender input")
+    for i, batch in enumerate(train_dataloader):
+        # Same as in egg's trainer
+        if not isinstance(batch, Batch):
+            batch = Batch(*batch)
+        print(batch)
+        print("Sender input size", batch['sender_input'].size())
+        if i > 5:
+            break
+    if i, batch in enumerate(valid_dataloader):
+        # Same as in egg's trainer
+        if not isinstance(batch, Batch):
+            batch = Batch(*batch)
+        print(batch)
+        print("Sender input size", batch['sender_input'].size())
+        if i > 5:
+            break
 
     ## CALLBACKS
     console_logger = ConsoleLogger(print_train_loss=True, as_json=True)
