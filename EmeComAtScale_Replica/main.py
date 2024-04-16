@@ -108,6 +108,14 @@ def main(args):
                                           data_subset=opts.data_subset
                                           )
 
+    print(f"Number of datasets: {len(dataset)} (should be 2 if data_split='all'")
+    print(f"Batch size: {opts.batch_size}")
+
+    assert opts.batch_size > 1
+
+    # Actually treated as list-of-datasets, either 1 or 2
+    assert len(dataset) == 1 or len(dataset) == 2
+
     train_dataloader = DataLoader(
         dataset[0],
         batch_size=opts.batch_size,
