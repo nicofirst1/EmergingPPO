@@ -145,7 +145,7 @@ def main(args):
         print("Sender input size", batch['sender_input'].size())
         if i > 5:
             break
-    if i, batch in enumerate(valid_dataloader):
+    for i, batch in enumerate(valid_dataloader):
         # Same as in egg's trainer
         if not isinstance(batch, Batch):
             batch = Batch(*batch)
