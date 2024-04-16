@@ -117,6 +117,9 @@ def main(args):
     # Actually treated as list-of-datasets, either 1 or 2
     assert len(dataset) == 1 or len(dataset) == 2
 
+    print("Train dataset", dataset[0])
+    print("Valid dataset", dataset[1])
+
     train_dataloader = DataLoader(
         dataset[0],
         batch_size=opts.batch_size,
@@ -136,7 +139,7 @@ def main(args):
 
 
     ## DUMMY SWEEPS
-    print("Dummy sweep sender input")
+    print("Dummy sweep train loader")
 
         
     for i, batch in enumerate(train_dataloader):
@@ -149,6 +152,8 @@ def main(args):
         print("Aux input size", batch.aux_input.size())
         if i > 5:
             break
+
+    print("Dummy sweep valid loader")
     for i, batch in enumerate(valid_dataloader):
         # Same as in egg's trainer
         if not isinstance(batch, Batch):

@@ -33,14 +33,31 @@ def load_and_preprocess_dataset(dataset_key:str,
 
     # if data_subset is not 1.0, load only a subset of the data
     if data_subset is not None:
+        # OLD version:
         # if it i less than zero we need to take a percentage of the data
-        if data_subset < 0:
+        # if data_subset < 0:
+        #     split = [f"{s}[:{int(data_subset * 100)}%]" for s in split]
+        # else:
+        #     split = [f"{s}[:{int(data_subset)}]" for s in split]
+
+        # NEW version:
+        print("[Warning] Revisit data subset code!")
+        assert data_subset > 0, "data_subset must be > 0"
+        if isinstance(data_subset, int):
+            # If int, we treat as absolute number
+            split = [f"{s}[:{data_subset)}]" for s in split]
+        elif isinstance(data_subset, float):
+            # If float, we treat as percentage
+            assert data_subset < 1.0, "float values for data_subset must be in ]0.0,1.0[ and are treated as percentage"
             split = [f"{s}[:{int(data_subset * 100)}%]" for s in split]
         else:
-            split = [f"{s}[:{int(data_subset)}]" for s in split]
+            raise ValueError("data_subset should be either absolute int, or relative float in ]0.0,1.0[. Use data_subset=None to load all data.")
+            
 
     # todo: load all splits
-    dataset = load_dataset(dataset_key, split=split)
+    print("Splits just before loading:", split)
+    dataset = [load_dataset(dataset_key, split=s) for s in split]
+    print("List of datasets right after loading:", dataset)
 
     # when loading two splits the dataset is a list, if not then only one split is loaded
     if not isinstance(dataset, list):

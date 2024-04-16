@@ -65,8 +65,8 @@ def get_data_opts(parser):
     group.add_argument(
         "--data_subset",
         type=float,
-        default=1.0,
-        help="A percentage of the dataset to load (default: 1.0)",
+        default=None,
+        help="A percentage of the dataset to load (default: None -> load all data)",
     )
 
     group.add_argument(
