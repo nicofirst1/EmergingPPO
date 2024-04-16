@@ -54,14 +54,14 @@ def load_and_preprocess_dataset(dataset_key:str,
             raise ValueError("data_subset should be either absolute int, or relative float in ]0.0,1.0[. Use data_subset=None to load all data.")
             
 
-    # todo: load all splits
     print("Splits just before loading:", split)
     dataset = [load_dataset(dataset_key, split=s) for s in split]
     print("List of datasets right after loading:", dataset)
 
     # when loading two splits the dataset is a list, if not then only one split is loaded
-    if not isinstance(dataset, list):
-        dataset = list(dataset)
+    # not needed anymore b/c of list comprehension above
+    #if not isinstance(dataset, list):
+    #    dataset = list(dataset)
 
     # filter all images where the mode is not RBG
     dataset = [d.filter(lambda e: e["image"].mode == "RGB") for d in dataset]
