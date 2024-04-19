@@ -71,7 +71,7 @@ def main(args):
         distractors=opts.distractors_num,
     )
 
-    logging_strategy = IntervalLoggingStrategy(
+    train_logging_strategy = IntervalLoggingStrategy(
         store_sender_input=True,
         store_receiver_input=False,
         store_labels=True,
@@ -82,13 +82,24 @@ def main(args):
         log_interval=opts.log_interval,
     )
 
+    test_logging_strategy = IntervalLoggingStrategy(
+        store_sender_input=True,
+        store_receiver_input=False,
+        store_labels=True,
+        store_aux_input=True,
+        store_message=True,
+        store_receiver_output=False,
+        store_message_length=False,
+        log_interval=1
+    )
+
     game = EmComSSLSymbolGame(
         sender=sender,
         receiver=receiver,
         loss=loss,
         distractors=opts.distractors_num,
-        train_logging_strategy=logging_strategy,
-        test_logging_strategy=logging_strategy,
+        train_logging_strategy=train_logging_strategy,
+        test_logging_strategy=test_logging_strategy,
     )
 
     model_parameters = list(sender.parameters()) + list(receiver.parameters())
@@ -171,7 +182,7 @@ def main(args):
     topsim = CustomTopographicSimilarity(
         sender_input_distance_fn="euclidean",
         message_distance_fn="edit",
-        compute_topsim_train_set=True,
+        compute_topsim_train_set=False,
         compute_topsim_test_set=True,
         is_gumbel=False,  # message should be already argmax'ed, 2024-04-16 lg
     )

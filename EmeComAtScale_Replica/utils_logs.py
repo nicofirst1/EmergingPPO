@@ -138,8 +138,8 @@ class CustomWandbLogger(WandbLogger):
                 self.img_msg_corr[img_id] = [msg]
 
         log_dict = {
-            f"{split}_loss": loss,
-            f"{split}_acc": acc,
+            f"{split}/loss": loss,
+            f"{split}/acc": acc,
             "epoch": epoch,
         }
 
