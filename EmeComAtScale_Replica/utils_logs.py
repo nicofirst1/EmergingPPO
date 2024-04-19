@@ -84,7 +84,7 @@ class CustomTopographicSimilarity(TopographicSimilarity):
 
         logs.aux["topsim"] = torch.as_tensor(topsim)
 
-        wandb_dict = {f"{mode}/topsim": topsim, "Epoch": epoch}
+        wandb_dict = {f"{mode}/topsim": topsim, "epoch": epoch}
         wandb.log(wandb_dict)
 
         print(wandb_dict, flush=True)
