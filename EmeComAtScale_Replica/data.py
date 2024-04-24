@@ -45,7 +45,7 @@ def load_and_preprocess_dataset(dataset_key:str,
         assert data_subset > 0, "data_subset must be > 0"
         if isinstance(data_subset, int):
             # If int, we treat as absolute number
-            split = [f"{s}[:{data_subset)}]" for s in split]
+            split = [f"{s}[:{data_subset}]" for s in split]
         elif isinstance(data_subset, float):
             # If float, we treat as percentage
             assert data_subset < 1.0, "float values for data_subset must be in ]0.0,1.0[ and are treated as percentage"
