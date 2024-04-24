@@ -104,7 +104,10 @@ class CustomWandbLogger(WandbLogger):
         if logs == Interaction.empty():
             return
 
-        acc = logs.aux["acc"].mean()
+        batch_acc_scores = logs.aux["acc"]
+        print("batch_acc_scores", batch_acc_scores.size())
+        print("batch_acc_scores.size()", batch_acc_scores.size())
+        acc = batch_acc_scores.mean()
         loss = loss.detach()
 
         batch_dict = dict(batch_loss=loss, batch_acc=acc)
