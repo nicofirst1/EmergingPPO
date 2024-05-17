@@ -1,5 +1,16 @@
 # EmergingPPO
 
+## Installation
+The project can be installed with 
+```bash
+python install .
+```
+
+or in edit mode with 
+
+```bash
+python install -e .
+```
 
 
 ## useful links

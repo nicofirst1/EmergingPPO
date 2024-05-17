@@ -166,6 +166,22 @@ def get_common_opts(params) -> argparse.Namespace:
         default=100,
         help="Interval for logging",
     )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default=".logs/",
+        help="Path to save the model",
+    )
+
+    parser.add_argument(
+        "--save_every_n_epochs",
+        type=int,
+        default=50,
+        help="Path to save the model",
+    )
+
+
+
 
     get_data_opts(parser)
     get_gs_opts(parser)

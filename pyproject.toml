@@ -1,0 +1,20 @@
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+name = "EmergingPPO"
+version = "0.0.1"
+description = "Emergent communication with Transformers"
+readme = "README.md"
+authors = ["Nicolo' Brandizzi", "Lukas Galke"]
+packages = [{ include = "src" }]
+
+
+[tool.poetry.dependencies]
+python = "^3.10"
+torch = ">=2.3.0"
+transformers = ">=4.40.2"
+datasets = ">=2.19.1"
+wandb = ">=0.17.0"
+EGG = { git = "https://github.com/nicofirst1/EGG.git" }
