@@ -13,6 +13,11 @@ python install -e .
 ```
 
 
+if you want to install the dev too use poetry :
+```bash 
+poetry install --dev
+```
+
 ## useful links
 - PPO code : https://github.com/huggingface/trl/blob/v0.7.9/trl/trainer/ppo_trainer.py
 - PPO example:  https://huggingface.co/docs/trl/ppo_trainer

@@ -1,8 +1,7 @@
-import editdistance
-from typing import Callable, Iterable, TypeVar, List, Generator
+from typing import Callable, Generator, Iterable, List, Tuple, TypeVar, Union
 
+import editdistance
 import torch
-from typing import List, Tuple, Union, Iterable
 from numpy.typing import ArrayLike
 
 # Extra types
@@ -18,6 +17,7 @@ T = TypeVar("T")
 ### BEGIN helpers to compute pairwise metrics ###
 #################################################
 
+
 def pairwise(
     f: Callable[[R, S], T], xs: Iterable[R], ys: Iterable[S]
 ) -> Generator[T, None, None]:
@@ -32,6 +32,7 @@ def pairwise_dedup(f: Callable[[S, S], T], xs: List[S]) -> Generator[T, None, No
         for b in xs[(i + 1) :]:
             yield f(a, b)
 
+
 def cumulative_average(xs: Iterable) -> float:
     """Efficient computation of the cumulative average from a generator"""
     ca = 0.0
@@ -39,9 +40,11 @@ def cumulative_average(xs: Iterable) -> float:
         ca += (x - ca) / (i + 1)
     return ca
 
+
 #################################################
 ### END helpers to compute pairwise metrics   ###
 #################################################
+
 
 def normalized_editdistance(a: Message, b: Message) -> float:
     """Calculates the edit distance divided by maximum length"""
@@ -51,7 +54,7 @@ def normalized_editdistance(a: Message, b: Message) -> float:
 
     try:
         # we normalize by the maximum length of the two sequences
-        # such that the distance is in [0, 1] 
+        # such that the distance is in [0, 1]
         # in contrast to egg which takes average length
         # It doesn't matter for spearman correlation in topsim.
         dist /= maxlen
@@ -66,8 +69,7 @@ def production_similarity(a: Message, b: Message) -> float:
     return 1 - normalized_editdistance(a, b)
 
 
-
-VALID_METRICS = {  
+VALID_METRICS = {
     "editdistance": editdistance.eval,
     "normalized_editdistance": normalized_editdistance,
     "production_similarity": production_similarity,

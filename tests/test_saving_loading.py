@@ -1,24 +1,21 @@
 import os
-from torch import nn
+
 import wandb
+from torch import nn
+
 from src.saver import ModelSaverCallback
 
 
-
-
 def test_save_model():
-
 
     wandb.init(project="test_project", mode="offline")
     # define empty nn.Model
     model = nn.Module()
 
-
     # define the path to save the model
     save_path = ".logs/"
 
-    saver= ModelSaverCallback(model, save_path, "test", save_every_n_epochs=1)
-
+    saver = ModelSaverCallback(model, save_path, "test", save_every_n_epochs=1)
 
     saver.on_epoch_end(0, 0, 0)
 
@@ -33,4 +30,3 @@ def test_save_model():
 
 if __name__ == "__main__":
     test_save_model()
-    

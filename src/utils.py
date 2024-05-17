@@ -169,7 +169,7 @@ def get_common_opts(params) -> argparse.Namespace:
     parser.add_argument(
         "--save_path",
         type=str,
-        default=".logs/",
+        default="logs/",
         help="Path to save the model",
     )
 
@@ -179,9 +179,6 @@ def get_common_opts(params) -> argparse.Namespace:
         default=50,
         help="Path to save the model",
     )
-
-
-
 
     get_data_opts(parser)
     get_gs_opts(parser)

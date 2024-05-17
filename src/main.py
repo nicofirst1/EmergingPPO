@@ -1,34 +1,25 @@
 import torch
 import wandb
-from egg.core import Trainer, ConsoleLogger
-from egg.core.interaction import IntervalLoggingStrategy
+from egg.core import ConsoleLogger, Trainer
 from egg.core.batch import Batch
+from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
 try:
-    from src.data import (
-        custom_collate_fn,
-        load_and_preprocess_dataset,
-    )
+    from src.data import custom_collate_fn, load_and_preprocess_dataset
     from src.losses import NTXentLoss
-    from src.utils import (
-        initialize_pretrained_models,
-        generate_vocab_file,
-        get_common_opts,
-    )
-    from src.utils_logs import (
-        CustomWandbLogger,
-        CustomTopographicSimilarity,
-    )
+    from src.utils import (generate_vocab_file, get_common_opts,
+                           initialize_pretrained_models)
+    from src.utils_logs import CustomTopographicSimilarity, CustomWandbLogger
 except ModuleNotFoundError:
     from data import custom_collate_fn, load_and_preprocess_dataset
     from losses import NTXentLoss
     from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
     from utils_logs import CustomWandbLogger, CustomTopographicSimilarity
 
+from models import EmComSSLSymbolGame, Receiver, Sender
 from src.saver import ModelSaverCallback
-from models import Sender, Receiver, EmComSSLSymbolGame
 
 
 def main(args):
@@ -209,7 +200,7 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[topsim, wandb_logger, console_logger,speaker_saver],
+        callbacks=[topsim, wandb_logger, console_logger, speaker_saver],
     )
 
     trainer.train(n_epochs=opts.n_epochs)

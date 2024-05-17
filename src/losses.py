@@ -1,4 +1,4 @@
-from typing import Tuple, Dict, Any
+from typing import Any, Dict, Tuple
 
 import torch
 from torch.nn import functional as F
@@ -35,26 +35,26 @@ class NTXentLoss:
     """
 
     def __init__(
-            self,
-            temperature: float = 1.0,
-            similarity: str = "cosine",
-            distractors: int = -1
+        self,
+        temperature: float = 1.0,
+        similarity: str = "cosine",
+        distractors: int = -1,
     ):
         self.temperature = temperature
         self.distractors = distractors
 
         similarities = {"cosine", "dot"}
         assert (
-                similarity.lower() in similarities
+            similarity.lower() in similarities
         ), f"Cannot recognize similarity function {similarity}"
         self.similarity = similarity
 
     @staticmethod
     def ntxent_loss(
-            sender_output: torch.Tensor,
-            receiver_output: torch.Tensor,
-            temperature: float = 1.0,
-            similarity: str = "cosine",
+        sender_output: torch.Tensor,
+        receiver_output: torch.Tensor,
+        temperature: float = 1.0,
+        similarity: str = "cosine",
     ) -> Tuple[torch.Tensor, Dict[str, Any]]:
 
         if sender_output.shape != receiver_output.shape:
@@ -69,7 +69,7 @@ class NTXentLoss:
         if similarity == "cosine":
             similarity_f = torch.nn.CosineSimilarity(dim=2)
             similarity_matrix = (
-                    similarity_f(input.unsqueeze(1), input.unsqueeze(0)) / temperature
+                similarity_f(input.unsqueeze(1), input.unsqueeze(0)) / temperature
             )
         elif similarity == "dot":
             similarity_matrix = input @ input.t()
@@ -95,7 +95,9 @@ class NTXentLoss:
         acc = (torch.argmax(logits.detach(), dim=1) == labels).float().detach()
         return loss, {"acc": acc}
 
-    def modified_ntxent_loss(self, text_embeddings, image_embeddings, correct_image, temperature=1.0):
+    def modified_ntxent_loss(
+        self, text_embeddings, image_embeddings, correct_image, temperature=1.0
+    ):
         """
         Custom contrastive loss function to align text embeddings with corresponding
         correct image embeddings and differentiate them from other images.
@@ -120,7 +122,9 @@ class NTXentLoss:
         text_embeddings_tiled = text_embeddings.unsqueeze(1).repeat(1, num_images, 1)
 
         # Compute similarity scores
-        similarities = torch.sum(text_embeddings_tiled * image_embeddings, dim=2) / temperature
+        similarities = (
+            torch.sum(text_embeddings_tiled * image_embeddings, dim=2) / temperature
+        )
 
         # Create labels - correct image will have label '1', others '0'
         labels = torch.zeros(batch_size, num_images, device=text_embeddings.device)
@@ -152,12 +156,12 @@ class NTXentLoss:
         return loss, aux_info
 
     def __call__(
-            self,
-            img_encoding,
-            text_encoding,
-            sender_message,
-            sender_socres,
-            labels,
+        self,
+        img_encoding,
+        text_encoding,
+        sender_message,
+        sender_socres,
+        labels,
     ):
 
         if self.distractors < 1:

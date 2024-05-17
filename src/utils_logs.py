@@ -1,15 +1,15 @@
+from typing import Callable, Union
+
+import numpy as np
 import torch
 import wandb
-import numpy as np
 from egg.core import Interaction
 from egg.core.callbacks import WandbLogger
 from egg.core.language_analysis import TopographicSimilarity
-
-from scipy.stats import pearsonr, spearmanr
 from scipy.spatial import distance
-from typing import Union, Callable
+from scipy.stats import pearsonr, spearmanr
 
-from measures import pairwise_dedup, normalized_editdistance, Message, Messages
+from measures import Message, Messages, normalized_editdistance, pairwise_dedup
 
 
 class CustomTopographicSimilarity(TopographicSimilarity):
@@ -23,8 +23,8 @@ class CustomTopographicSimilarity(TopographicSimilarity):
 
         distances = {
             # original
-            #"edit": lambda x, y: editdistance.eval(x, y) / ((len(x) + len(y)) / 2),
-            "edit": normalized_editdistance, # my version
+            # "edit": lambda x, y: editdistance.eval(x, y) / ((len(x) + len(y)) / 2),
+            "edit": normalized_editdistance,  # my version
             "cosine": distance.cosine,
             "hamming": distance.hamming,
             "jaccard": distance.jaccard,
@@ -88,7 +88,6 @@ class CustomTopographicSimilarity(TopographicSimilarity):
         wandb.log(wandb_dict)
 
         print(wandb_dict, flush=True)
-
 
 
 class CustomWandbLogger(WandbLogger):

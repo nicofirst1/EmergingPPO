@@ -18,3 +18,7 @@ transformers = ">=4.40.2"
 datasets = ">=2.19.1"
 wandb = ">=0.17.0"
 EGG = { git = "https://github.com/nicofirst1/EGG.git" }
+
+[tool.poetry.dev-dependencies]
+black = "^24.4.2"
+isort = "^5.13.2"
