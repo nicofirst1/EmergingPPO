@@ -1,21 +1,30 @@
 # EmergingPPO
 
 ## Installation
-The project can be installed with 
+
+The project can be installed with the installation script from the working dir
 ```bash
-python install .
+bash scripts/install.sh
 ```
 
-or in edit mode with 
+### Pip installation
+It can also be installed with pip in edit mode with 
 
 ```bash
-python install -e .
+pip install -e .
 ```
 
 
-if you want to install the dev too use poetry :
+If you want to install the dev  :
 ```bash 
-poetry install --dev
+pip install -e .[dev]
+```
+
+## Testing
+In order to test you need to install the dev packages as shown above. 
+then use
+```bash
+pytest
 ```
 
 ## useful links

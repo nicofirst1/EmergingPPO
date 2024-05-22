@@ -4,12 +4,13 @@
 # macos
 .DS_Store
 
-# wandb
-*/wandb/
+*wandb/
+*cachedir/
+settings.json
 
 # custom vocab
 *vocab.txt
-
+*launch.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

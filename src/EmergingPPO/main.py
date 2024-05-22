@@ -6,20 +6,14 @@ from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
-try:
-    from src.data import custom_collate_fn, load_and_preprocess_dataset
-    from src.losses import NTXentLoss
-    from src.utils import (generate_vocab_file, get_common_opts,
-                           initialize_pretrained_models)
-    from src.utils_logs import CustomTopographicSimilarity, CustomWandbLogger
-except ModuleNotFoundError:
-    from data import custom_collate_fn, load_and_preprocess_dataset
-    from losses import NTXentLoss
-    from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from utils_logs import CustomWandbLogger, CustomTopographicSimilarity
 
-from models import EmComSSLSymbolGame, Receiver, Sender
-from src.saver import ModelSaverCallback
+from EmergingPPO.data import custom_collate_fn, load_and_preprocess_dataset
+from EmergingPPO.losses import NTXentLoss
+from EmergingPPO.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
+from EmergingPPO.utils_logs import CustomWandbLogger, CustomTopographicSimilarity
+
+from EmergingPPO.models import EmComSSLSymbolGame, Receiver, Sender
+from EmergingPPO.saver import ModelSaverCallback
 
 
 def main(args):
