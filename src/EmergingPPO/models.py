@@ -9,10 +9,16 @@ import torch
 import torch.nn as nn
 from egg.core import SenderReceiverContinuousCommunication
 from torch.nn import Parameter
-from transformers import (GPT2Config, GPT2LMHeadModel, GPT2Model,
-                          GPT2TokenizerFast, MaxLengthCriteria,
-                          PreTrainedTokenizerBase, StoppingCriteriaList,
-                          ViTModel)
+from transformers import (
+    GPT2Config,
+    GPT2LMHeadModel,
+    GPT2Model,
+    GPT2TokenizerFast,
+    MaxLengthCriteria,
+    PreTrainedTokenizerBase,
+    StoppingCriteriaList,
+    ViTModel,
+)
 
 
 class GubleLogitsProcessor(nn.Module):

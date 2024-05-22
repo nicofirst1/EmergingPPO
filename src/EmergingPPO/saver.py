@@ -1,8 +1,9 @@
 import os
 
 import torch
-import wandb
 from egg.core.callbacks import Callback
+
+import wandb
 
 
 class ModelSaverCallback(Callback):

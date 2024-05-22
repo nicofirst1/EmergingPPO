@@ -1,19 +1,21 @@
 import torch
-import wandb
 from egg.core import ConsoleLogger, Trainer
 from egg.core.batch import Batch
 from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
-
+import wandb
 from EmergingPPO.data import custom_collate_fn, load_and_preprocess_dataset
 from EmergingPPO.losses import NTXentLoss
-from EmergingPPO.utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-from EmergingPPO.utils_logs import CustomWandbLogger, CustomTopographicSimilarity
-
 from EmergingPPO.models import EmComSSLSymbolGame, Receiver, Sender
 from EmergingPPO.saver import ModelSaverCallback
+from EmergingPPO.utils import (
+    generate_vocab_file,
+    get_common_opts,
+    initialize_pretrained_models,
+)
+from EmergingPPO.utils_logs import CustomTopographicSimilarity, CustomWandbLogger
 
 
 def main(args):

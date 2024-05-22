@@ -2,14 +2,14 @@ from typing import Callable, Union
 
 import numpy as np
 import torch
-import wandb
 from egg.core import Interaction
 from egg.core.callbacks import WandbLogger
 from egg.core.language_analysis import TopographicSimilarity
+from measures import Message, Messages, normalized_editdistance, pairwise_dedup
 from scipy.spatial import distance
 from scipy.stats import pearsonr, spearmanr
 
-from measures import Message, Messages, normalized_editdistance, pairwise_dedup
+import wandb
 
 
 class CustomTopographicSimilarity(TopographicSimilarity):

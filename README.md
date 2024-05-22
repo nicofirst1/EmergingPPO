@@ -7,17 +7,16 @@ The project can be installed with the installation script from the working dir
 bash scripts/install.sh
 ```
 
-### Pip installation
-It can also be installed with pip in edit mode with 
+### Dev installation
 
-```bash
-pip install -e .
-```
-
-
-If you want to install the dev  :
+If you want to install the dev packages, use pip  :
 ```bash 
 pip install -e .[dev]
+```
+
+Remember to install the pre-commit for automatic formatting:
+```bash
+pre-commit install
 ```
 
 ## Testing

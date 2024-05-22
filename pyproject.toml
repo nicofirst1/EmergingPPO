@@ -24,8 +24,11 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev=["black>=24.4.2", "isort>=5.13.2", "pytest>=6.2.4"]
+dev=["black>=24.4.2", "isort>=5.13.2", "pytest>=6.2.4", "pre-commit",]
 
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.isort]
+profile = "black"
