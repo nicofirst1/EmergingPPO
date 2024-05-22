@@ -2,13 +2,14 @@ import copy
 
 import torch
 from datasets import load_dataset
-from EmeComAtScale_Replica.data import custom_collate_fn, emecom_map
-from EmeComAtScale_Replica.losses import NTXentLoss
-from EmeComAtScale_Replica.models import Receiver, Sender
-from EmeComAtScale_Replica.utils import initialize_pretrained_models
+
+from EmergingPPO.data import emecom_map
+from EmergingPPO.losses import NTXentLoss
+from EmergingPPO.models import Receiver, Sender
+from EmergingPPO.utils import initialize_pretrained_models
 
 
-def test():
+def test_loss():
     # define the batch size and the number of distractors
     batch_size = 2
     distractors = 3
@@ -76,7 +77,3 @@ def test():
     optimizer.step()
 
     print(message_logits)
-
-
-if __name__ == "__main__":
-    test()

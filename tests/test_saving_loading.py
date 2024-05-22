@@ -1,9 +1,9 @@
 import os
 
-import wandb
 from torch import nn
 
-from src.saver import ModelSaverCallback
+import wandb
+from EmergingPPO.saver import ModelSaverCallback
 
 
 def test_save_model():
@@ -26,7 +26,3 @@ def test_save_model():
     os.remove(".logs/test_model_0.pth")
 
     print("Test passed")
-
-
-if __name__ == "__main__":
-    test_save_model()

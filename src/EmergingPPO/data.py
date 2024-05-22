@@ -8,6 +8,8 @@ from datasets.formatting.formatting import LazyBatch
 from joblib import Memory
 from transformers import ViTImageProcessor
 
+from EmergingPPO.utils import initialize_pretrained_models
+
 location = "./cachedir"
 memory = Memory(location, verbose=1)
 
@@ -22,8 +24,8 @@ def load_and_preprocess_dataset(
     dataset_key: str,
     split: str,
     vision_chk: str,
-    distractors_num: Optional[int] = 0,  # Legacy, we use batch size instead
     data_subset: Optional[Union[float, int]] = None,
+    load_from_cache_file: bool = False,
 ):
 
     # if split is all, load both train and test
@@ -34,14 +36,7 @@ def load_and_preprocess_dataset(
 
     # if data_subset is not 1.0, load only a subset of the data
     if data_subset is not None:
-        # OLD version:
-        # if it i less than zero we need to take a percentage of the data
-        # if data_subset < 0:
-        #     split = [f"{s}[:{int(data_subset * 100)}%]" for s in split]
-        # else:
-        #     split = [f"{s}[:{int(data_subset)}]" for s in split]
 
-        # NEW version:
         print("[Warning] Revisit data subset code!")
         assert data_subset > 0, "data_subset must be > 0"
         if isinstance(data_subset, int):
@@ -71,20 +66,25 @@ def load_and_preprocess_dataset(
     dataset = [d.filter(lambda e: e["image"].mode == "RGB") for d in dataset]
 
     image_processor = ViTImageProcessor.from_pretrained(vision_chk)
+    image_encoder = initialize_pretrained_models(vision_chk)
+
+    # concat processor and encoder
+    image_fn = lambda kwargs: image_encoder(
+        image_processor(**kwargs).data["pixel_values"]
+    )
 
     # preprocess the images
     dataset = [
         d.map(
             emecom_map,
-            batched=True,
+            batched=False,
             with_indices=True,
             remove_columns=["image"],
             fn_kwargs={
-                "num_distractors": distractors_num,
-                "image_processor": image_processor,
+                "image_processor": image_fn,
             },
             num_proc=1,
-            load_from_cache_file=False,
+            load_from_cache_file=load_from_cache_file,
         )
         for d in dataset
     ]
@@ -94,42 +94,24 @@ def load_and_preprocess_dataset(
 def emecom_map(
     example: LazyBatch,
     indices: List[int],
-    num_distractors: int,
-    image_processor: ViTImageProcessor,
+    image_processor,
 ):
 
     images_list = example["image"]
 
-    # process every image
-    image = image_processor(images_list, return_tensors="pt").data["pixel_values"]
+    # process every image with embedding
+    # dim [1, 197, 768]
+    # pooled is [1, 768]
+    image = image_processor(dict(images=images_list, return_tensors="pt"))
+    image = image.last_hidden_state
 
     batch_size = len(image)
     samples = []
     labels = []
 
-    if num_distractors < 1:
-        samples = image
-        labels = torch.zeros((batch_size, 1), dtype=torch.int)
-        # labels = images_list
-
-    else:
-
-        for idx in range(batch_size):
-            target = image[idx]
-
-            # get distractors random indices from batch_size excluded the idx
-            indices = list(range(batch_size))
-            indices.remove(idx)
-            indices = random.sample(indices, num_distractors)
-
-            distractors = [image[i] for i in indices]
-            sample = [target] + distractors
-
-            # randomly permute the samples and save the target index
-            indices = torch.randperm(len(sample))
-            sample = [sample[i] for i in indices]
-            samples.append(sample)
-            labels.append(indices[0])
+    samples = image
+    labels = torch.zeros((batch_size, 1), dtype=torch.int)
+    # labels = images_list
 
     res_dict = {"sample": samples, "label": labels, "img_id": indices}
 
@@ -138,8 +120,9 @@ def emecom_map(
 
 def custom_collate_fn(batch):
     receiver_input = torch.stack([torch.as_tensor(item["sample"]) for item in batch])
+    # dim [batch_size, 1,197, 768]
     labels = torch.stack([torch.as_tensor(item["label"]) for item in batch])
     img_ids = torch.as_tensor([item["img_id"] for item in batch])
-    sender_input = receiver_input[torch.arange(receiver_input.shape[0]), labels]
+    sender_input = receiver_input
 
     return sender_input, labels, receiver_input, img_ids

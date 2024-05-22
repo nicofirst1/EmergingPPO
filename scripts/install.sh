@@ -2,6 +2,7 @@
 
 
 WORKING_DIR=$(pwd)
+USE_DEV=0
 
 # ask if working directory is correct
 echo "Current working directory is $WORKING_DIR"
@@ -19,7 +20,13 @@ python3 -m venv venv
 # activate venv
 source venv/bin/activate
 
+
 # install requirements
-pip install -e .
+if [ $USE_DEV -eq 1 ]; then
+    pip install -e .[dev]
+    pre-commit install
+else
+    pip install -e .
+fi
 
 

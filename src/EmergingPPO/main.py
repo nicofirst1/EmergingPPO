@@ -105,7 +105,6 @@ def main(args):
         "Maysee/tiny-imagenet",
         opts.data_split,
         opts.vision_chk,
-        distractors_num=opts.distractors_num,
         data_subset=opts.data_subset,
     )
 

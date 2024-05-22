@@ -10,15 +10,16 @@ import torch.nn as nn
 from egg.core import SenderReceiverContinuousCommunication
 from torch.nn import Parameter
 from transformers import (
+    GenerationConfig,
     GPT2Config,
     GPT2LMHeadModel,
     GPT2Model,
-    GPT2TokenizerFast,
     MaxLengthCriteria,
     PreTrainedTokenizerBase,
     StoppingCriteriaList,
     ViTModel,
 )
+from transformers.generation import LogitsProcessorList
 
 
 class GubleLogitsProcessor(nn.Module):
@@ -72,13 +73,10 @@ class Sender(nn.Module):
         self.tokenizer = tokenizer
         self.encoder = img_encoder
 
-        # Define stopping criteria and logits processor
-        self.stopping_criteria = (
-            MaxLengthCriteria(max_length=6)
-            if stopping_criteria is None
-            else stopping_criteria
-        )
-        self.logit_processor = GubleLogitsProcessor(temperature=gs_temperature)
+        # Define logits processor
+
+        logit_processor = GubleLogitsProcessor(temperature=gs_temperature)
+        self.logit_processor = LogitsProcessorList([logit_processor])
 
         # init decoder
         config_decoder = GPT2Config(
@@ -95,6 +93,19 @@ class Sender(nn.Module):
 
         # Initialize weights for decoder
         self.decoder.init_weights()
+
+        self.generation_config = GenerationConfig(
+            # choose greedy decoding
+            do_sample=False,
+            num_beams=1,
+            # stopping criteria
+            max_length=6,
+            # others
+            pad_token_id=self.tokenizer.pad_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            output_scores=True,
+            return_dict_in_generate=True,
+        )
 
     @staticmethod
     def prepare_inputs_for_generation(
@@ -124,6 +135,18 @@ class Sender(nn.Module):
     def parameters(self, recurse: bool = True) -> Iterator[Parameter]:
         return self.decoder.parameters(recurse)
 
+    @staticmethod
+    def search_for_orig(decorated, orig_name):
+        # hacky way to remove decorator
+        for obj in (c.cell_contents for c in decorated.__closure__):
+            if hasattr(obj, "__name__") and obj.__name__ == orig_name:
+                return obj
+            if hasattr(obj, "__closure__") and obj.__closure__:
+                found = search_for_orig(obj, orig_name)
+                if found:
+                    return found
+        return None
+
     def forward(self, sender_input: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass through the Sender.
@@ -137,7 +160,11 @@ class Sender(nn.Module):
         pixel_values = sender_input
 
         # Forward pass through the encoder
-        enc_out = self.encoder(pixel_values=pixel_values)
+        # enc_out = self.encoder(pixel_values=pixel_values)
+        enc_out = sender_input
+        # dim [batch_size, 1, 197, 768]
+        pooled_enc_out = enc_out.mean(dim=2)
+        # dim [batch_size, 1, 768]
 
         # Create the decoder input
         bos_token_id = self.tokenizer.bos_token_id
@@ -145,16 +172,17 @@ class Sender(nn.Module):
         decoder_input_ids = torch.full((batch_size, 1), bos_token_id, dtype=torch.long)
         decoder_input_ids = decoder_input_ids.to(pixel_values.device)
 
+        # remove the no_grad decorator to enable backpropagation
+        generate_fn = self.search_for_orig(self.decoder.generate, "generate")
+
         # Forward generation through the decoder
-        gen_out = self.decoder.greedy_search(
-            decoder_input_ids,
-            pad_token_id=self.tokenizer.pad_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            output_scores=True,
-            encoder_outputs=enc_out,
-            encoder_hidden_states=enc_out.last_hidden_state,  # enables cross attention
-            stopping_criteria=self.stopping_criteria,
-            return_dict_in_generate=True,
+        gen_out = generate_fn(
+            # pass self since we lost it with the decorator
+            self=self.decoder,
+            inputs=decoder_input_ids,
+            generation_config=self.generation_config,
+            # enables cross attention by passing the pooled encoder out
+            encoder_hidden_states=pooled_enc_out,
             logits_processor=self.logit_processor,
         )
 
@@ -237,22 +265,12 @@ class Receiver(nn.Module):
         """
 
         # image encoding
-        pixel_values = receiver_input
+        img_enc_out = receiver_input
 
-        if pixel_values.ndim > 4:
-            # using distractors [batch size, distractors, img_dim x3]
-            img_enc_out = [self.img_encoder(pixel_values=pv) for pv in pixel_values]
-            img_enc_out = [self.pool_img(e.last_hidden_state) for e in img_enc_out]
-            img_enc_out = [self.W_img(e) for e in img_enc_out]
-            img_enc_out = torch.stack(img_enc_out)
-        else:
-            # no distractors [batch size, img_dim x3]
+        img_enc_out = self.pool_img(img_enc_out)
+        img_enc_out = self.W_img(img_enc_out)
 
-            img_enc_out = self.img_encoder(pixel_values).last_hidden_state
-            img_enc_out = self.pool_img(img_enc_out)
-            img_enc_out = self.W_img(img_enc_out)
-
-            # text encoding
+        # text encoding
         txt_enc_out = self.text_embedding(scores)
         txt_enc_out = self.pool_txt(txt_enc_out)
         txt_enc_out = self.W_txt(txt_enc_out)

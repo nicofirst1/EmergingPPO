@@ -18,6 +18,7 @@ dependencies = [
     "transformers >= 4.40.2",
     "datasets >= 2.19.1",
     "wandb >= 0.17.0",
+    "lovely-tensors >= 0.1.14",
     "EGG @ git+https://github.com/nicofirst1/EGG.git",
 
 ]

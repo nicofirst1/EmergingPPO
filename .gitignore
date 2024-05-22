@@ -6,11 +6,15 @@
 
 *wandb/
 *cachedir/
+venv/
 settings.json
 
 # custom vocab
 *vocab.txt
+*.pkl
+*.json
 *launch.json
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
