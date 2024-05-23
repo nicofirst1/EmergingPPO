@@ -285,7 +285,7 @@ class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
 
         txt_enc_out, img_enc_out = self.receiver(scores, receiver_input)
 
-        loss, aux_info = self.loss(img_enc_out, txt_enc_out, message, scores, labels)
+        loss, aux_info = self.loss(img_enc_out, txt_enc_out)
 
         aux_info["img_id"] = aux_input
 
