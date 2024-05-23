@@ -157,9 +157,6 @@ class NTXentLoss:
         self,
         img_encoding,
         text_encoding,
-        sender_message,
-        sender_socres,
-        labels,
     ):
 
         return self.ntxent_loss(

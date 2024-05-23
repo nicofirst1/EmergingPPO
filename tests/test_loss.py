@@ -8,7 +8,7 @@ from EmergingPPO.models import Receiver, Sender
 from EmergingPPO.utils import generate_vocab_file
 
 
-def test_loss():
+def test_grad_update():
     # define the batch size and the number of distractors
     batch_size = 2
     vocab_size = 10
@@ -29,8 +29,8 @@ def test_loss():
 
     receiver = Receiver(tokenizer, linear_dim=123, vocab_size=vocab_size)
 
-    copy.deepcopy(list(sender.parameters()))
-    copy.deepcopy(list(receiver.parameters()))
+    orig_sender_p = copy.deepcopy(list(sender.parameters()))
+    orig_receiver_p = copy.deepcopy(list(receiver.parameters()))
 
     # loss and optimizer
     loss = NTXentLoss(
@@ -52,7 +52,7 @@ def test_loss():
 
     optimizer.zero_grad()
     # select the batch
-    dummy_input = torch.randn(dummy_input_dim)
+    dummy_input = torch.rand(dummy_input_dim, dtype=torch.float32)
     # forward pass through the sender
     message_logits, scores = sender(dummy_input)
 
@@ -60,12 +60,23 @@ def test_loss():
 
     txt_enc_out, img_enc_out = receiver_out
 
-    l, acc = loss.modified_ntxent_loss(txt_enc_out, img_enc_out, labels)
-
+    l, acc = loss(txt_enc_out, img_enc_out)
+    l = l.mean()
     l.backward()
     optimizer.step()
 
-    print(message_logits)
+    # check if the parameters have been updated
+
+    sender = [
+        torch.equal(orig_p, p) for orig_p, p in zip(orig_sender_p, sender.parameters())
+    ]
+    receiver = [
+        torch.equal(orig_p, p)
+        for orig_p, p in zip(orig_receiver_p, receiver.parameters())
+    ]
+
+    assert not all(sender)
+    assert not all(receiver)
 
 
 if __name__ == "__main__":
