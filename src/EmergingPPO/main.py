@@ -3,19 +3,16 @@ from egg.core import ConsoleLogger, Trainer
 from egg.core.batch import Batch
 from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
-from transformers import BertTokenizerFast, MaxLengthCriteria
+from transformers import BertTokenizerFast
 
 import wandb
+from EmergingPPO.args import get_common_opts
 from EmergingPPO.data import custom_collate_fn, load_and_preprocess_dataset
+from EmergingPPO.logging_callbacks import CustomTopographicSimilarity, CustomWandbLogger
 from EmergingPPO.losses import NTXentLoss
 from EmergingPPO.models import EmComSSLSymbolGame, Receiver, Sender
 from EmergingPPO.saver import ModelSaverCallback
-from EmergingPPO.utils import (
-    generate_vocab_file,
-    get_common_opts,
-    initialize_pretrained_models,
-)
-from EmergingPPO.utils_logs import CustomTopographicSimilarity, CustomWandbLogger
+from EmergingPPO.utils import generate_vocab_file
 
 
 def main(args):
@@ -25,25 +22,18 @@ def main(args):
     # opts.device = torch.device("mps")
     print(f"{opts}\n")
 
-    img_encoder = initialize_pretrained_models(opts.vision_chk)
-
     # tokenizer
     vocab_file = generate_vocab_file(opts.vocab_size)
     tokenizer = BertTokenizerFast(vocab_file=vocab_file)
     tokenizer.bos_token_id = tokenizer.cls_token_id
 
-    # stopping criteria as maxlength for decoder
-    stopping_criteria = MaxLengthCriteria(max_length=opts.max_len)
-
     sender = Sender(
-        img_encoder=img_encoder,
         tokenizer=tokenizer,
         vocab_size=opts.vocab_size,
-        stopping_criteria=stopping_criteria,
+        max_length=opts.max_len,
         gs_temperature=opts.gs_temperature,
     )
     receiver = Receiver(
-        img_encoder=img_encoder,
         tokenizer=tokenizer,
         vocab_size=opts.vocab_size,
         linear_dim=opts.projection_output_dim,
@@ -56,7 +46,6 @@ def main(args):
     loss = NTXentLoss(
         temperature=opts.loss_temperature,
         similarity=opts.similarity,
-        distractors=opts.distractors_num,
     )
 
     train_logging_strategy = IntervalLoggingStrategy(
@@ -85,7 +74,6 @@ def main(args):
         sender=sender,
         receiver=receiver,
         loss=loss,
-        distractors=opts.distractors_num,
         train_logging_strategy=train_logging_strategy,
         test_logging_strategy=test_logging_strategy,
     )
@@ -147,7 +135,7 @@ def main(args):
         print("Labels size", batch.labels.size())
         print("Receiver input size", batch.receiver_input.size())
         print("Aux input size", batch.aux_input.size())
-        if i > 5:
+        if i > 2:
             break
 
     print("Dummy sweep valid loader")
@@ -159,15 +147,15 @@ def main(args):
         print("Labels size", batch.labels.size())
         print("Receiver input size", batch.receiver_input.size())
         print("Aux input size", batch.aux_input.size())
-        if i > 5:
+        if i > 2:
             break
 
     ## CALLBACKS
     console_logger = ConsoleLogger(print_train_loss=True, as_json=True)
 
     topsim = CustomTopographicSimilarity(
-        sender_input_distance_fn="euclidean",
-        message_distance_fn="edit",
+        sender_input_distance_fn=opts.sender_input_distance_fn,
+        message_distance_fn=opts.message_distance_fn,
         compute_topsim_train_set=False,
         compute_topsim_test_set=True,
         is_gumbel=False,  # message should be already argmax'ed, 2024-04-16 lg
@@ -181,7 +169,10 @@ def main(args):
     )
 
     speaker_saver = ModelSaverCallback(
-        sender, opts.save_path, "sender", save_every_n_epochs=opts.save_every_n_epochs
+        sender, opts.save_path, "speaker", save_every_n_epochs=opts.save_every_n_epochs
+    )
+    listener_saver = ModelSaverCallback(
+        sender, opts.save_path, "listener", save_every_n_epochs=opts.save_every_n_epochs
     )
 
     # wandb.watch(game)
@@ -195,7 +186,7 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[topsim, wandb_logger, console_logger, speaker_saver],
+        callbacks=[topsim, wandb_logger, console_logger, speaker_saver, listener_saver],
     )
 
     trainer.train(n_epochs=opts.n_epochs)

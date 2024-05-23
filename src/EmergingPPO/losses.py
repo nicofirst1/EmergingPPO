@@ -38,10 +38,8 @@ class NTXentLoss:
         self,
         temperature: float = 1.0,
         similarity: str = "cosine",
-        distractors: int = -1,
     ):
         self.temperature = temperature
-        self.distractors = distractors
 
         similarities = {"cosine", "dot"}
         assert (
@@ -164,17 +162,9 @@ class NTXentLoss:
         labels,
     ):
 
-        if self.distractors < 1:
-            return self.ntxent_loss(
-                img_encoding,
-                text_encoding,
-                temperature=self.temperature,
-                similarity=self.similarity,
-            )
-        else:
-            return self.modified_ntxent_loss(
-                img_encoding,
-                text_encoding,
-                labels,
-                temperature=self.temperature,
-            )
+        return self.ntxent_loss(
+            img_encoding,
+            text_encoding,
+            temperature=self.temperature,
+            similarity=self.similarity,
+        )

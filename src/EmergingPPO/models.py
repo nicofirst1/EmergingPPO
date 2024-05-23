@@ -3,7 +3,7 @@ Transformer-based models for emergent communication
 """
 
 from functools import partial
-from typing import Iterator, Optional, Tuple
+from typing import Iterator, Tuple
 
 import torch
 import torch.nn as nn
@@ -14,10 +14,7 @@ from transformers import (
     GPT2Config,
     GPT2LMHeadModel,
     GPT2Model,
-    MaxLengthCriteria,
     PreTrainedTokenizerBase,
-    StoppingCriteriaList,
-    ViTModel,
 )
 from transformers.generation import LogitsProcessorList
 
@@ -36,7 +33,7 @@ class GubleLogitsProcessor(nn.Module):
         self.temperature = temperature
         self.hard = hard
 
-    def forward(self, scores: torch.Tensor, next_token_logits) -> torch.Tensor:
+    def forward(self, input_ids: torch.Tensor, next_token_logits) -> torch.Tensor:
         """
         Apply the Gumbel-Softmax trick to the input scores.
 
@@ -46,9 +43,16 @@ class GubleLogitsProcessor(nn.Module):
         Returns:
             torch.Tensor: The processed scores.
         """
-        return torch.nn.functional.gumbel_softmax(
+
+        # check this for explenation https://github.com/pytorch/pytorch/issues/97851
+        scores = torch.nn.functional.gumbel_softmax(
             next_token_logits, tau=self.temperature, hard=self.hard
         )
+
+        # print("next_token_logits in GubleLogitsProcessor:\n", next_token_logits.deeper)
+        # print("scores in GubleLogitsProcessor:\n", scores.deeper)
+
+        return scores
 
 
 class Sender(nn.Module):
@@ -56,22 +60,19 @@ class Sender(nn.Module):
     Sender/receiver agent based on vision encoder decoder.
 
     Args:
-        img_encoder (ViTModel): The image encoder.
         tokenizer (GPT2TokenizerFast): The tokenizer.
     """
 
     def __init__(
         self,
-        img_encoder: ViTModel,
         tokenizer: PreTrainedTokenizerBase,
-        stopping_criteria: Optional[StoppingCriteriaList] = None,
         vocab_size: int = 6,
+        max_length: int = 6,
         gs_temperature: float = 1.0,
     ):
         super().__init__()
 
         self.tokenizer = tokenizer
-        self.encoder = img_encoder
 
         # Define logits processor
 
@@ -99,10 +100,11 @@ class Sender(nn.Module):
             do_sample=False,
             num_beams=1,
             # stopping criteria
-            max_length=6,
+            max_length=max_length,
             # others
             pad_token_id=self.tokenizer.pad_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
+            bos_token_id=self.tokenizer.bos_token_id,
             output_scores=True,
             return_dict_in_generate=True,
         )
@@ -157,20 +159,13 @@ class Sender(nn.Module):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: The messages and scores.
         """
-        pixel_values = sender_input
 
         # Forward pass through the encoder
         # enc_out = self.encoder(pixel_values=pixel_values)
         enc_out = sender_input
-        # dim [batch_size, 1, 197, 768]
-        pooled_enc_out = enc_out.mean(dim=2)
-        # dim [batch_size, 1, 768]
-
-        # Create the decoder input
-        bos_token_id = self.tokenizer.bos_token_id
-        batch_size = pixel_values.shape[0]
-        decoder_input_ids = torch.full((batch_size, 1), bos_token_id, dtype=torch.long)
-        decoder_input_ids = decoder_input_ids.to(pixel_values.device)
+        # dim [batch_size, 197, 768]
+        pooled_enc_out = enc_out.mean(dim=1)
+        # dim [batch_size, 768]
 
         # remove the no_grad decorator to enable backpropagation
         generate_fn = self.search_for_orig(self.decoder.generate, "generate")
@@ -179,16 +174,20 @@ class Sender(nn.Module):
         gen_out = generate_fn(
             # pass self since we lost it with the decorator
             self=self.decoder,
-            inputs=decoder_input_ids,
+            # inputs=decoder_input_ids,
             generation_config=self.generation_config,
             # enables cross attention by passing the pooled encoder out
-            encoder_hidden_states=pooled_enc_out,
+            encoder_hidden_states=enc_out,
             logits_processor=self.logit_processor,
         )
 
         messages = gen_out.sequences
         scores = torch.stack(gen_out.scores, dim=1)
+        # dim [batch_size, max_length, vocab_size]
 
+        # print ("messages :\n", messages.deeper)
+        # print ("scores :\n", scores.deeper)
+        # print ('\n\n')
         return messages, scores
 
 
@@ -199,7 +198,6 @@ class Receiver(nn.Module):
 
     def __init__(
         self,
-        img_encoder: ViTModel,
         tokenizer: PreTrainedTokenizerBase,
         linear_dim: int = 123,
         vocab_size: int = 6,
@@ -208,13 +206,11 @@ class Receiver(nn.Module):
         Initialize the Receiver with an image encoder, tokenizer, and linear dimension.
 
         Args:
-            img_encoder (ViTModel): The image encoder.
             tokenizer (GPT2TokenizerFast): The tokenizer.
             linear_dim (int): The linear dimension for the image and text encoders.
         """
         super().__init__()
 
-        self.img_encoder = img_encoder
         self.tokenizer = tokenizer
 
         # decoder
@@ -222,7 +218,8 @@ class Receiver(nn.Module):
         self.text_encoder = GPT2Model(config=config_decoder)
 
         # linear layers
-        self.W_img = nn.Linear(self.img_encoder.config.hidden_size, linear_dim)
+        img_hidden_size = 768
+        self.W_img = nn.Linear(img_hidden_size, linear_dim)
         self.W_txt = nn.Linear(self.text_encoder.embed_dim, linear_dim)
         self.text_embedding = nn.Linear(
             vocab_size, self.text_encoder.config.hidden_size
@@ -279,14 +276,10 @@ class Receiver(nn.Module):
 
 
 class EmComSSLSymbolGame(SenderReceiverContinuousCommunication):
-    def __init__(self, distractors, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super(EmComSSLSymbolGame, self).__init__(*args, **kwargs)
-        self.distractors = distractors
 
     def forward(self, sender_input, labels, receiver_input, aux_input=None):
-        if self.distractors < 1:
-            # if no distractors present input is the same for both
-            sender_input = receiver_input
 
         message, scores = self.sender(sender_input)
 

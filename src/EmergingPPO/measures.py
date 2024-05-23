@@ -1,8 +1,7 @@
-from typing import Callable, Generator, Iterable, List, Tuple, TypeVar, Union
+from typing import Callable, Generator, Iterable, List, TypeVar, Union
 
 import editdistance
 import torch
-from numpy.typing import ArrayLike
 
 # Extra types
 Message = Union[str, List[int], torch.Tensor]

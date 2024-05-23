@@ -5,11 +5,11 @@ import torch
 from egg.core import Interaction
 from egg.core.callbacks import WandbLogger
 from egg.core.language_analysis import TopographicSimilarity
-from measures import Message, Messages, normalized_editdistance, pairwise_dedup
 from scipy.spatial import distance
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import spearmanr
 
 import wandb
+from EmergingPPO.measures import Messages, normalized_editdistance, pairwise_dedup
 
 
 class CustomTopographicSimilarity(TopographicSimilarity):
@@ -104,8 +104,8 @@ class CustomWandbLogger(WandbLogger):
             return
 
         batch_acc_scores = logs.aux["acc"]
-        print("batch_acc_scores", batch_acc_scores.size())
-        print("batch_acc_scores.size()", batch_acc_scores.size())
+        # print("batch_acc_scores", batch_acc_scores.size())
+        # print("batch_acc_scores.size()", batch_acc_scores.size())
         acc = batch_acc_scores.mean()
         loss = loss.detach()
 

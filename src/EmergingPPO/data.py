@@ -1,5 +1,3 @@
-import random
-from argparse import Namespace
 from typing import List
 
 import torch
@@ -37,8 +35,6 @@ def load_and_preprocess_dataset(
     # if data_subset is not 1.0, load only a subset of the data
     if data_subset is not None:
 
-        print("[Warning] Revisit data subset code!")
-        assert data_subset > 0, "data_subset must be > 0"
         if isinstance(data_subset, int):
             # If int, we treat as absolute number
             split = [f"{s}[:{data_subset}]" for s in split]
@@ -76,8 +72,8 @@ def load_and_preprocess_dataset(
     # preprocess the images
     dataset = [
         d.map(
-            emecom_map,
-            batched=False,
+            data_map,
+            batched=True,
             with_indices=True,
             remove_columns=["image"],
             fn_kwargs={
@@ -91,7 +87,7 @@ def load_and_preprocess_dataset(
     return dataset
 
 
-def emecom_map(
+def data_map(
     example: LazyBatch,
     indices: List[int],
     image_processor,
@@ -99,21 +95,19 @@ def emecom_map(
 
     images_list = example["image"]
 
-    # process every image with embedding
-    # dim [1, 197, 768]
-    # pooled is [1, 768]
+    # process every image with image processor and then embed it with the image encoder
+    # dim [batch, 197, 768]
+    # pooled is [batch, 768]
     image = image_processor(dict(images=images_list, return_tensors="pt"))
     image = image.last_hidden_state
 
     batch_size = len(image)
-    samples = []
     labels = []
 
-    samples = image
     labels = torch.zeros((batch_size, 1), dtype=torch.int)
     # labels = images_list
 
-    res_dict = {"sample": samples, "label": labels, "img_id": indices}
+    res_dict = {"sample": image, "label": labels, "img_id": indices}
 
     return res_dict
 

@@ -1,46 +1,36 @@
 import copy
 
 import torch
-from datasets import load_dataset
+from transformers import BertTokenizerFast
 
-from EmergingPPO.data import emecom_map
 from EmergingPPO.losses import NTXentLoss
 from EmergingPPO.models import Receiver, Sender
-from EmergingPPO.utils import initialize_pretrained_models
+from EmergingPPO.utils import generate_vocab_file
 
 
 def test_loss():
     # define the batch size and the number of distractors
     batch_size = 2
-    distractors = 3
+    vocab_size = 10
+    max_length = 6
+    dummy_input_dim = [batch_size, 197, 768]
 
-    # initialize the  models
-    tokenizer, image_processor, img_encoder = initialize_pretrained_models()
+    # tokenizer
+    vocab_file = generate_vocab_file(vocab_size)
+    tokenizer = BertTokenizerFast(vocab_file=vocab_file)
+    tokenizer.bos_token_id = tokenizer.cls_token_id
 
-    sender = Sender(img_encoder=img_encoder, tokenizer=tokenizer)
-    receiver = Receiver(img_encoder=img_encoder, tokenizer=tokenizer)
-
-    sender_w = copy.deepcopy(list(sender.parameters()))
-    receiver_w = copy.deepcopy(list(receiver.parameters()))
-    img_encoder_w = copy.deepcopy(list(img_encoder.parameters()))
-
-    # load the dataset
-    dataset = load_dataset("Maysee/tiny-imagenet", split="train")
-    dataset = dataset.filter(lambda e, i: i < 100, with_indices=True)
-    # preprocess the images
-    dataset = dataset.map(
-        emecom_map,
-        batched=True,
-        remove_columns=["image"],
-        fn_kwargs={"num_distractors": distractors, "image_processor": image_processor},
+    sender = Sender(
+        tokenizer=tokenizer,
+        vocab_size=vocab_size,
+        max_length=max_length,
+        gs_temperature=1,
     )
 
-    dataloader = torch.utils.data.DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        collate_fn=custom_collate_fn,
-    )
+    receiver = Receiver(tokenizer, linear_dim=123, vocab_size=vocab_size)
+
+    copy.deepcopy(list(sender.parameters()))
+    copy.deepcopy(list(receiver.parameters()))
 
     # loss and optimizer
     loss = NTXentLoss(
@@ -62,12 +52,11 @@ def test_loss():
 
     optimizer.zero_grad()
     # select the batch
-    batch = dataloader.__iter__().__next__()
-    sender_input, labels, receiver_input = batch
+    dummy_input = torch.randn(dummy_input_dim)
     # forward pass through the sender
-    message_logits, scores = sender(sender_input)  # [bsz, seqlen, vocab_size]
+    message_logits, scores = sender(dummy_input)
 
-    receiver_out = receiver(scores=scores, receiver_input=receiver_input)
+    receiver_out = receiver(scores=scores, receiver_input=dummy_input)
 
     txt_enc_out, img_enc_out = receiver_out
 
@@ -77,3 +66,7 @@ def test_loss():
     optimizer.step()
 
     print(message_logits)
+
+
+if __name__ == "__main__":
+    test_loss()

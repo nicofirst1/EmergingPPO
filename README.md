@@ -14,9 +14,14 @@ If you want to install the dev packages, use pip  :
 pip install -e .[dev]
 ```
 
-Remember to install the pre-commit for automatic formatting:
+Remember to install the pre-commit for formatting checker :
 ```bash
 pre-commit install
+```
+And run the autoformat script
+```bash
+chmod +x scripts/format.sh
+./scripts/format.sh
 ```
 
 ## Testing
