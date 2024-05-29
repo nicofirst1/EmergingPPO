@@ -1,33 +1,21 @@
 import torch
-import wandb
-from egg.core import Trainer, ConsoleLogger
-from egg.core.interaction import IntervalLoggingStrategy
+from egg.core import ConsoleLogger, Trainer
 from egg.core.batch import Batch
+from egg.core.interaction import IntervalLoggingStrategy
 from torch.utils.data import DataLoader
 from transformers import BertTokenizerFast, MaxLengthCriteria
 
-try:
-    from EmeComAtScale_Replica.data import (
-        custom_collate_fn,
-        load_and_preprocess_dataset,
-    )
-    from EmeComAtScale_Replica.losses import NTXentLoss
-    from EmeComAtScale_Replica.utils import (
-        initialize_pretrained_models,
-        generate_vocab_file,
-        get_common_opts,
-    )
-    from EmeComAtScale_Replica.utils_logs import (
-        CustomWandbLogger,
-        CustomTopographicSimilarity,
-    )
-except ModuleNotFoundError:
-    from data import custom_collate_fn, load_and_preprocess_dataset
-    from losses import NTXentLoss
-    from utils import initialize_pretrained_models, generate_vocab_file, get_common_opts
-    from utils_logs import CustomWandbLogger, CustomTopographicSimilarity
-
-from models import Sender, Receiver, EmComSSLSymbolGame
+import wandb
+from EmergingPPO.data import custom_collate_fn, load_and_preprocess_dataset
+from EmergingPPO.losses import NTXentLoss
+from EmergingPPO.models import EmComSSLSymbolGame, Receiver, Sender
+from EmergingPPO.saver import ModelSaverCallback
+from EmergingPPO.utils import (
+    generate_vocab_file,
+    get_common_opts,
+    initialize_pretrained_models,
+)
+from EmergingPPO.utils_logs import CustomTopographicSimilarity, CustomWandbLogger
 
 
 def main(args):
@@ -90,7 +78,7 @@ def main(args):
         store_message=True,
         store_receiver_output=False,
         store_message_length=False,
-        log_interval=1
+        log_interval=1,
     )
 
     game = EmComSSLSymbolGame(
@@ -113,12 +101,13 @@ def main(args):
     #     optimizer, T_max=5
     # )
 
-    dataset = load_and_preprocess_dataset("Maysee/tiny-imagenet",
-                                          opts.data_split,
-                                          opts.vision_chk,
-                                          distractors_num=opts.distractors_num,
-                                          data_subset=opts.data_subset
-                                          )
+    dataset = load_and_preprocess_dataset(
+        "Maysee/tiny-imagenet",
+        opts.data_split,
+        opts.vision_chk,
+        distractors_num=opts.distractors_num,
+        data_subset=opts.data_subset,
+    )
 
     print(f"Number of datasets: {len(dataset)} (should be 2 if data_split='all'")
     print(f"Batch size: {opts.batch_size}")
@@ -148,11 +137,9 @@ def main(args):
     else:
         valid_dataloader = None
 
-
     ## DUMMY SWEEPS
     print("Dummy sweep train loader")
 
-        
     for i, batch in enumerate(train_dataloader):
         # Same as in egg's trainer
         if not isinstance(batch, Batch):
@@ -194,8 +181,12 @@ def main(args):
         mode="offline" if opts.debug else "online",
     )
 
+    speaker_saver = ModelSaverCallback(
+        sender, opts.save_path, "sender", save_every_n_epochs=opts.save_every_n_epochs
+    )
+
     # wandb.watch(game)
-    #wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
+    # wandb.watch((sender, receiver), log_freq=1000, log_graph=False)
     # 2024-04-10, lg: Run finished with no logs uploaded to wb -> we have our custom log freq now, do we need wb's?
     wandb.watch((sender, receiver), log_graph=False)
 
@@ -205,8 +196,9 @@ def main(args):
         # optimizer_scheduler=optimizer_scheduler,
         train_data=train_dataloader,
         validation_data=valid_dataloader,
-        callbacks=[topsim, wandb_logger, console_logger],
+        callbacks=[topsim, wandb_logger, console_logger, speaker_saver],
     )
+
     trainer.train(n_epochs=opts.n_epochs)
 
 

@@ -1,5 +1,0 @@
-torch
-transformers
-datasets
-wandb
-git+https://github.com/nicofirst1/EGG.git

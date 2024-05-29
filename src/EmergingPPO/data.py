@@ -14,16 +14,17 @@ memory = Memory(location, verbose=1)
 from typing import Optional, Union
 
 
-
 ##########################################################
 ### Keep arguments simple such that caching works fine ###
 ##########################################################
 @memory.cache
-def load_and_preprocess_dataset(dataset_key:str,
-                                split:str,
-                                vision_chk:str,
-                                distractors_num:Optional[int]=0,  # Legacy, we use batch size instead
-                                data_subset:Optional[Union[float,int]]=None):
+def load_and_preprocess_dataset(
+    dataset_key: str,
+    split: str,
+    vision_chk: str,
+    distractors_num: Optional[int] = 0,  # Legacy, we use batch size instead
+    data_subset: Optional[Union[float, int]] = None,
+):
 
     # if split is all, load both train and test
     if split == "all":
@@ -48,11 +49,14 @@ def load_and_preprocess_dataset(dataset_key:str,
             split = [f"{s}[:{data_subset}]" for s in split]
         elif isinstance(data_subset, float):
             # If float, we treat as percentage
-            assert data_subset < 1.0, "float values for data_subset must be in ]0.0,1.0[ and are treated as percentage"
+            assert (
+                data_subset < 1.0
+            ), "float values for data_subset must be in ]0.0,1.0[ and are treated as percentage"
             split = [f"{s}[:{int(data_subset * 100)}%]" for s in split]
         else:
-            raise ValueError("data_subset should be either absolute int, or relative float in ]0.0,1.0[. Use data_subset=None to load all data.")
-            
+            raise ValueError(
+                "data_subset should be either absolute int, or relative float in ]0.0,1.0[. Use data_subset=None to load all data."
+            )
 
     print("Splits just before loading:", split)
     dataset = [load_dataset(dataset_key, split=s) for s in split]
@@ -60,7 +64,7 @@ def load_and_preprocess_dataset(dataset_key:str,
 
     # when loading two splits the dataset is a list, if not then only one split is loaded
     # not needed anymore b/c of list comprehension above
-    #if not isinstance(dataset, list):
+    # if not isinstance(dataset, list):
     #    dataset = list(dataset)
 
     # filter all images where the mode is not RBG

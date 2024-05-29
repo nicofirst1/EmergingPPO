@@ -2,10 +2,9 @@ import copy
 
 import torch
 from datasets import load_dataset
-
-from EmeComAtScale_Replica.data import emecom_map, custom_collate_fn
+from EmeComAtScale_Replica.data import custom_collate_fn, emecom_map
 from EmeComAtScale_Replica.losses import NTXentLoss
-from EmeComAtScale_Replica.models import Sender, Receiver
+from EmeComAtScale_Replica.models import Receiver, Sender
 from EmeComAtScale_Replica.utils import initialize_pretrained_models
 
 
@@ -25,11 +24,15 @@ def test():
     img_encoder_w = copy.deepcopy(list(img_encoder.parameters()))
 
     # load the dataset
-    dataset = load_dataset('Maysee/tiny-imagenet', split='train')
+    dataset = load_dataset("Maysee/tiny-imagenet", split="train")
     dataset = dataset.filter(lambda e, i: i < 100, with_indices=True)
     # preprocess the images
-    dataset = dataset.map(emecom_map, batched=True, remove_columns=["image"],
-                          fn_kwargs={"num_distractors": distractors, "image_processor": image_processor}, )
+    dataset = dataset.map(
+        emecom_map,
+        batched=True,
+        remove_columns=["image"],
+        fn_kwargs={"num_distractors": distractors, "image_processor": image_processor},
+    )
 
     dataloader = torch.utils.data.DataLoader(
         dataset,

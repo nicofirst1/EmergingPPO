@@ -3,7 +3,7 @@ Transformer-based models for emergent communication
 """
 
 from functools import partial
-from typing import Iterator, Tuple, Optional
+from typing import Iterator, Optional, Tuple
 
 import torch
 import torch.nn as nn
@@ -11,13 +11,13 @@ from egg.core import SenderReceiverContinuousCommunication
 from torch.nn import Parameter
 from transformers import (
     GPT2Config,
-    MaxLengthCriteria,
-    GPT2Model,
     GPT2LMHeadModel,
-    ViTModel,
+    GPT2Model,
     GPT2TokenizerFast,
-    StoppingCriteriaList,
+    MaxLengthCriteria,
     PreTrainedTokenizerBase,
+    StoppingCriteriaList,
+    ViTModel,
 )
 
 
